@@ -1,334 +1,442 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
+import {
+  appendTrack,
+  candidate,
+  createWorld,
+  inside,
+  nextCell,
+  parseWorld,
+  placeDecoration,
+  same,
+  sampleRoute,
+  sampleTrack,
+  STORAGE_KEY,
+  trackLength,
+  type Point,
+  type Tool,
+  type Turn,
+  type World,
+} from "../game/model";
+import {
+  decoration,
+  diamond,
+  drawTrack,
+  ground,
+  locomotive,
+  project,
+  unproject,
+} from "../game/art";
 
-type TrackDirection = 'x' | 'y';
-
-interface GridPoint {
-  x: number;
-  y: number;
+export interface GameStatus {
+  world: World;
+  tool: Tool;
+  playing: boolean;
+  canUndo: boolean;
+  canRedo: boolean;
+  saved: boolean;
+  zoom: number;
 }
-
-interface DragState {
-  pointerId: number;
-  startX: number;
-  startY: number;
-  lastX: number;
-  lastY: number;
-  moved: boolean;
-}
-
 export class WebTrainScene extends Phaser.Scene {
-  private readonly gridSize = 18;
-  private readonly tileWidth = 96;
-  private readonly tileHeight = 48;
-
+  world: World = createWorld();
+  tool: Tool = "track";
+  playing = false;
+  selected = true;
+  saved = true;
+  private history: string[] = [];
+  private future: string[] = [];
+  private scenery: Phaser.GameObjects.Graphics[] = [];
+  private rails!: Phaser.GameObjects.Graphics;
   private preview!: Phaser.GameObjects.Graphics;
-  private trackDirection: TrackDirection = 'x';
-  private dragState: DragState | null = null;
-  private lastPinchDistance = 0;
-  private readonly tracks = new Map<string, Phaser.GameObjects.Graphics>();
+  private train!: Phaser.GameObjects.Graphics;
+  private carriage!: Phaser.GameObjects.Graphics;
+  private marker!: Phaser.GameObjects.Graphics;
+  private drag: {
+    id: number;
+    x: number;
+    y: number;
+    lastX: number;
+    lastY: number;
+    moved: boolean;
+  } | null = null;
+  private pinch = 0;
+  private distance = 0.8;
+  private travelDirection = 1;
+  private speed = 1;
+  onChange?: (status: GameStatus) => void;
+  onMessage?: (message: string) => void;
+  onAnchor?: (x: number, y: number, visible: boolean, blocked: boolean) => void;
 
   constructor() {
-    super('WebTrainScene');
+    super("WebTrainScene");
   }
-
-  create(): void {
-    this.drawGround();
-    this.preview = this.add.graphics().setDepth(1000).setVisible(false);
-
-    this.input.addPointer(2);
-    this.configureCamera();
+  create() {
+    try {
+      this.world =
+        parseWorld(localStorage.getItem(STORAGE_KEY)) ?? createWorld();
+    } catch {
+      this.saved = false;
+    }
+    const floor = this.add.graphics();
+    ground(floor);
+    this.rails = this.add.graphics().setDepth(1);
+    this.marker = this.add.graphics().setDepth(2);
+    this.preview = this.add.graphics().setDepth(2000);
+    this.train = this.add.graphics();
+    this.carriage = this.add.graphics();
+    this.drawWorld();
+    this.home();
     this.configureInput();
-  }
-
-  public rotateTrackDirection(): TrackDirection {
-    this.trackDirection = this.trackDirection === 'x' ? 'y' : 'x';
-    return this.trackDirection;
-  }
-
-  private configureCamera(): void {
-    const camera = this.cameras.main;
-    const mapWidth = this.gridSize * this.tileWidth;
-    const mapHeight = this.gridSize * this.tileHeight;
-
-    camera.setBounds(
-      -mapWidth / 2 - 380,
-      -280,
-      mapWidth + 760,
-      mapHeight + 640,
+    this.scale.on("resize", this.resize, this);
+    this.events.once("shutdown", () =>
+      this.scale.off("resize", this.resize, this),
     );
-    camera.setZoom(1);
-    camera.centerOn(0, ((this.gridSize - 1) * this.tileHeight) / 2);
+    this.game.events.emit("world-ready", this);
   }
-
-  private configureInput(): void {
-    this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
-      const downPointers = this.getDownPointers();
-
-      if (downPointers.length >= 2) {
-        this.dragState = null;
-        this.lastPinchDistance = this.pointerDistance(downPointers[0], downPointers[1]);
+  private resize() {
+    this.preview.clear();
+    this.home();
+  }
+  emit() {
+    this.onChange?.({
+      world: this.world,
+      tool: this.tool,
+      playing: this.playing,
+      canUndo: this.history.length > 0,
+      canRedo: this.future.length > 0,
+      saved: this.saved,
+      zoom: this.cameras.main.zoom,
+    });
+  }
+  private remember() {
+    this.history.push(JSON.stringify(this.world));
+    if (this.history.length > 60) this.history.shift();
+    this.future = [];
+  }
+  private commit() {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.world));
+      this.saved = true;
+    } catch {
+      this.saved = false;
+    }
+    this.distance = Math.min(this.distance, this.routeLength() - 0.05);
+    this.preview.clear();
+    this.drawWorld();
+    this.emit();
+  }
+  setTool(tool: Tool) {
+    this.tool = tool;
+    this.selected = tool === "track";
+    this.preview.clear();
+    this.emit();
+  }
+  setPlaying() {
+    this.playing = !this.playing;
+    this.emit();
+  }
+  setSpeed(speed: number) {
+    this.speed = speed;
+  }
+  extend(turn: Turn) {
+    if (!candidate(this.world, turn)) {
+      this.onMessage?.("Burada yer yok. Son rayı silip başka bir yöne dön.");
+      return;
+    }
+    this.remember();
+    appendTrack(this.world, turn);
+    this.selected = true;
+    this.commit();
+    if (this.world.closed)
+      this.onMessage?.("Harika! Kapalı bir rota yaptın. Treni çalıştır.");
+  }
+  removeLast() {
+    if (this.world.tracks.length <= 1) {
+      this.onMessage?.(
+        "Başlangıç rayı burada kalsın. Buradan yeni bir yol yapabilirsin.",
+      );
+      return;
+    }
+    this.remember();
+    this.world.tracks.pop();
+    this.world.closed = false;
+    this.selected = true;
+    this.commit();
+  }
+  undo() {
+    const previous = this.history.pop();
+    if (!previous) return;
+    this.future.push(JSON.stringify(this.world));
+    this.restore(previous);
+  }
+  redo() {
+    const next = this.future.pop();
+    if (!next) return;
+    this.history.push(JSON.stringify(this.world));
+    this.restore(next);
+  }
+  private restore(snapshot: string) {
+    const before = this.world.tracks.length + this.world.decorations.length;
+    this.world = JSON.parse(snapshot);
+    this.commit();
+    // A reset changes the whole scene; bring the restored world back into view.
+    const after = this.world.tracks.length + this.world.decorations.length;
+    if (Math.abs(after - before) > 1) this.home();
+  }
+  reset() {
+    this.remember();
+    this.world = {
+      version: 1,
+      tracks: [{ x: 8, y: 9, entry: 0, exit: 0 }],
+      decorations: [],
+      closed: false,
+    };
+    this.playing = false;
+    this.distance = 0.5;
+    this.travelDirection = 1;
+    this.tool = "track";
+    this.selected = true;
+    this.commit();
+    this.home();
+  }
+  home() {
+    const camera = this.cameras.main;
+    const mobile = this.scale.width < 760;
+    const points = (
+      mobile
+        ? this.world.tracks
+        : [...this.world.tracks, ...this.world.decorations]
+    ).map(project);
+    const minX = Math.min(...points.map((p) => p.x)) - 45,
+      maxX = Math.max(...points.map((p) => p.x)) + 45;
+    const minY = Math.min(...points.map((p) => p.y)) - (mobile ? 30 : 100),
+      maxY = Math.max(...points.map((p) => p.y)) + 30;
+    const area = {
+      left: mobile ? 15 : 100,
+      right:
+        this.scale.width - (mobile ? 120 : this.scale.width < 1000 ? 295 : 350),
+      top: this.scale.height < 550 ? 145 : mobile ? 245 : 235,
+      bottom: this.scale.height - (this.scale.height < 550 ? 105 : 170),
+    };
+    const zoom = Phaser.Math.Clamp(
+      Math.min(
+        (area.right - area.left) / (maxX - minX),
+        (area.bottom - area.top) / (maxY - minY),
+      ),
+      0.3,
+      mobile ? 0.82 : 1.18,
+    );
+    camera.setZoom(zoom);
+    camera.centerOn(
+      (minX + maxX) / 2 +
+        (this.scale.width / 2 - (area.left + area.right) / 2) / zoom,
+      (minY + maxY) / 2 +
+        (this.scale.height / 2 - (area.top + area.bottom) / 2) / zoom,
+    );
+    this.emit();
+  }
+  zoom(factor: number, x = this.scale.width / 2, y = this.scale.height / 2) {
+    const camera = this.cameras.main;
+    const old = camera.zoom,
+      next = Phaser.Math.Clamp(old * factor, 0.3, 2.2);
+    camera.scrollX += (x - camera.width / 2) * (1 / old - 1 / next);
+    camera.scrollY += (y - camera.height / 2) * (1 / old - 1 / next);
+    camera.setZoom(next);
+    this.preview.clear();
+    this.emit();
+  }
+  previewTurn(turn: Turn | null) {
+    this.preview.clear().setAlpha(1);
+    if (turn === null) return;
+    const track = candidate(this.world, turn);
+    if (track) drawTrack(this.preview, track, 0.6);
+  }
+  private drawWorld() {
+    this.rails.clear();
+    for (const track of this.world.tracks) drawTrack(this.rails, track);
+    this.scenery.forEach((g) => g.destroy());
+    this.scenery = this.world.decorations.map((d) => {
+      const p = project(d),
+        g = this.add.graphics({ x: p.x, y: p.y }).setDepth(10 + p.y);
+      decoration(g, d.kind);
+      return g;
+    });
+    this.marker.clear();
+    const first = project(sampleTrack(this.world.tracks[0], 0).point);
+    this.marker
+      .lineStyle(6, 0x95714f)
+      .lineBetween(first.x - 7, first.y - 11, first.x + 7, first.y - 4);
+    this.marker
+      .lineStyle(3, 0xf3ddaf)
+      .lineBetween(first.x - 7, first.y - 14, first.x + 7, first.y - 7);
+  }
+  private routeLength() {
+    return this.world.tracks.reduce((sum, t) => sum + trackLength(t), 0);
+  }
+  update(_time: number, delta: number) {
+    if (!this.train) return;
+    const length = this.routeLength();
+    if (this.playing) {
+      this.distance +=
+        (Math.min(delta, 60) / 1000) * this.speed * 1.25 * this.travelDirection;
+      if (this.world.closed) this.distance = (this.distance + length) % length;
+      else if (this.distance >= length - 0.12) {
+        this.distance = length - 0.12;
+        this.travelDirection = -1;
+      } else if (this.distance <= 0.12) {
+        this.distance = 0.12;
+        this.travelDirection = 1;
+      }
+    }
+    const pose = sampleRoute(this.world.tracks, this.distance);
+    const tangent = {
+      x: pose.tangent.x * this.travelDirection,
+      y: pose.tangent.y * this.travelDirection,
+    };
+    this.train.clear();
+    locomotive(this.train, pose.point, tangent);
+    this.train.setDepth(10 + project(pose.point).y);
+    const behind = this.distance - 0.65 * this.travelDirection;
+    this.carriage.clear();
+    if (this.world.closed || (behind > 0 && behind < length)) {
+      const car = sampleRoute(this.world.tracks, (behind + length) % length);
+      locomotive(this.carriage, car.point, car.tangent, true);
+      this.carriage.setDepth(10 + project(car.point).y);
+    }
+    const last = this.world.tracks.at(-1)!;
+    const endpoint = project(sampleTrack(last, 1).point),
+      camera = this.cameras.main;
+    const x =
+      (endpoint.x - camera.scrollX - camera.width / 2) * camera.zoom +
+      camera.width / 2;
+    const y =
+      (endpoint.y - camera.scrollY - camera.height / 2) * camera.zoom +
+      camera.height / 2;
+    this.onAnchor?.(
+      x,
+      y,
+      this.selected && this.tool === "track" && !this.world.closed,
+      !candidate(this.world, 0),
+    );
+  }
+  private configureInput() {
+    const down = () => this.input.manager.pointers.filter((p) => p.isDown);
+    this.input.on("pointerdown", (p: Phaser.Input.Pointer) => {
+      if (down().length >= 2) {
+        this.drag = null;
+        this.pinch = Phaser.Math.Distance.BetweenPoints(down()[0], down()[1]);
+        this.preview.clear();
         return;
       }
-
-      this.dragState = {
-        pointerId: pointer.id,
-        startX: pointer.x,
-        startY: pointer.y,
-        lastX: pointer.x,
-        lastY: pointer.y,
+      this.drag = {
+        id: p.id,
+        x: p.x,
+        y: p.y,
+        lastX: p.x,
+        lastY: p.y,
         moved: false,
       };
-
-      this.updatePreview(pointer);
     });
-
-    this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => {
-      const downPointers = this.getDownPointers();
-
-      if (downPointers.length >= 2) {
-        this.handlePinch(downPointers[0], downPointers[1]);
-        this.preview.setVisible(false);
-        return;
-      }
-
-      if (
-        pointer.isDown &&
-        this.dragState &&
-        pointer.id === this.dragState.pointerId
-      ) {
-        const totalDistance = Phaser.Math.Distance.Between(
-          this.dragState.startX,
-          this.dragState.startY,
-          pointer.x,
-          pointer.y,
+    this.input.on("pointermove", (p: Phaser.Input.Pointer) => {
+      const fingers = down();
+      if (fingers.length >= 2) {
+        const distance = Phaser.Math.Distance.BetweenPoints(
+          fingers[0],
+          fingers[1],
         );
-
-        if (totalDistance > 7) {
-          this.dragState.moved = true;
-        }
-
-        if (this.dragState.moved) {
-          const camera = this.cameras.main;
-          const dx = pointer.x - this.dragState.lastX;
-          const dy = pointer.y - this.dragState.lastY;
-
-          camera.scrollX -= dx / camera.zoom;
-          camera.scrollY -= dy / camera.zoom;
-        }
-
-        this.dragState.lastX = pointer.x;
-        this.dragState.lastY = pointer.y;
+        if (this.pinch > 0)
+          this.zoom(
+            distance / this.pinch,
+            (fingers[0].x + fingers[1].x) / 2,
+            (fingers[0].y + fingers[1].y) / 2,
+          );
+        this.pinch = distance;
         return;
       }
-
-      this.updatePreview(pointer);
-    });
-
-    this.input.on('pointerup', (pointer: Phaser.Input.Pointer) => {
-      if (
-        this.dragState &&
-        pointer.id === this.dragState.pointerId &&
-        !this.dragState.moved
-      ) {
-        this.placeTrackAtPointer(pointer);
+      if (p.isDown && this.drag?.id === p.id) {
+        const d = this.drag;
+        if (Math.hypot(p.x - d.x, p.y - d.y) > 7) d.moved = true;
+        if (d.moved) {
+          this.cameras.main.scrollX -= (p.x - d.lastX) / this.cameras.main.zoom;
+          this.cameras.main.scrollY -= (p.y - d.lastY) / this.cameras.main.zoom;
+          this.preview.clear();
+        }
+        d.lastX = p.x;
+        d.lastY = p.y;
+        return;
       }
-
-      this.dragState = null;
-      this.lastPinchDistance = 0;
-      this.updatePreview(pointer);
+      this.previewAt(p);
     });
-
+    this.input.on("pointerup", (p: Phaser.Input.Pointer) => {
+      if (this.drag?.id === p.id && !this.drag.moved) this.tap(p);
+      this.drag = null;
+      this.pinch = 0;
+    });
+    this.input.on("pointerupoutside", () => {
+      this.drag = null;
+      this.pinch = 0;
+    });
+    this.input.on("gameout", () => this.preview.clear());
     this.input.on(
-      'wheel',
-      (
-        pointer: Phaser.Input.Pointer,
-        _gameObjects: Phaser.GameObjects.GameObject[],
-        _deltaX: number,
-        deltaY: number,
-      ) => {
-        this.zoomAround(pointer.x, pointer.y, deltaY > 0 ? 0.9 : 1.1);
-      },
+      "wheel",
+      (p: Phaser.Input.Pointer, _objects: unknown, _dx: number, dy: number) =>
+        this.zoom(dy > 0 ? 0.9 : 1.1, p.x, p.y),
     );
   }
-
-  private getDownPointers(): Phaser.Input.Pointer[] {
-    return this.input.manager.pointers.filter((pointer) => pointer.isDown);
+  private cellAt(p: Phaser.Input.Pointer) {
+    return unproject(
+      p.positionToCamera(this.cameras.main) as Phaser.Math.Vector2,
+    );
   }
-
-  private handlePinch(
-    first: Phaser.Input.Pointer,
-    second: Phaser.Input.Pointer,
-  ): void {
-    const distance = this.pointerDistance(first, second);
-
-    if (this.lastPinchDistance <= 0) {
-      this.lastPinchDistance = distance;
-      return;
-    }
-
-    const midpointX = (first.x + second.x) / 2;
-    const midpointY = (first.y + second.y) / 2;
-    const factor = Phaser.Math.Clamp(distance / this.lastPinchDistance, 0.85, 1.15);
-
-    this.zoomAround(midpointX, midpointY, factor);
-    this.lastPinchDistance = distance;
-  }
-
-  private zoomAround(screenX: number, screenY: number, factor: number): void {
-    const camera = this.cameras.main;
-    const before = camera.getWorldPoint(screenX, screenY);
-    const nextZoom = Phaser.Math.Clamp(camera.zoom * factor, 0.55, 2.2);
-
-    camera.setZoom(nextZoom);
-
-    const after = camera.getWorldPoint(screenX, screenY);
-    camera.scrollX += before.x - after.x;
-    camera.scrollY += before.y - after.y;
-  }
-
-  private pointerDistance(
-    first: Phaser.Input.Pointer,
-    second: Phaser.Input.Pointer,
-  ): number {
-    return Phaser.Math.Distance.Between(first.x, first.y, second.x, second.y);
-  }
-
-  private drawGround(): void {
-    const ground = this.add.graphics().setDepth(0);
-
-    for (let gridY = 0; gridY < this.gridSize; gridY += 1) {
-      for (let gridX = 0; gridX < this.gridSize; gridX += 1) {
-        const center = this.gridToWorld(gridX, gridY);
-        const points = this.diamondPoints(center.x, center.y);
-        const alternate = (gridX + gridY) % 2 === 0;
-
-        ground.fillStyle(alternate ? 0x88cf48 : 0x83ca43, 1);
-        ground.fillPoints(points, true);
-        ground.lineStyle(1, 0xb7e47b, 0.58);
-        ground.strokePoints(points, true);
-      }
-    }
-  }
-
-  private placeTrackAtPointer(pointer: Phaser.Input.Pointer): void {
-    const cell = this.pointerToGrid(pointer);
-    if (!cell) return;
-
-    const key = `${cell.x}:${cell.y}`;
-    const previous = this.tracks.get(key);
-    previous?.destroy();
-
-    const center = this.gridToWorld(cell.x, cell.y);
-    const track = this.add.graphics({
-      x: center.x,
-      y: center.y,
-    });
-
-    track.setDepth(100 + center.y);
-    this.drawStraightTrack(track, this.trackDirection, 1);
-    this.tracks.set(key, track);
-  }
-
-  private updatePreview(pointer: Phaser.Input.Pointer): void {
-    const cell = this.pointerToGrid(pointer);
-
-    if (!cell) {
-      this.preview.setVisible(false);
-      return;
-    }
-
-    const center = this.gridToWorld(cell.x, cell.y);
+  private previewAt(p: Phaser.Input.Pointer) {
+    const cell = this.cellAt(p);
     this.preview.clear();
-    this.preview.setPosition(center.x, center.y);
-
-    const diamond = this.diamondPoints(0, 0);
-    this.preview.lineStyle(3, 0xffffff, 0.58);
-    this.preview.strokePoints(diamond, true);
-    this.drawStraightTrack(this.preview, this.trackDirection, 0.52);
-    this.preview.setVisible(true);
-  }
-
-  private drawStraightTrack(
-    graphics: Phaser.GameObjects.Graphics,
-    direction: TrackDirection,
-    alpha: number,
-  ): void {
-    const halfX = this.tileWidth / 2;
-    const halfY = this.tileHeight / 2;
-
-    const start = direction === 'x'
-      ? new Phaser.Math.Vector2(-halfX, -halfY)
-      : new Phaser.Math.Vector2(-halfX, halfY);
-    const end = direction === 'x'
-      ? new Phaser.Math.Vector2(halfX, halfY)
-      : new Phaser.Math.Vector2(halfX, -halfY);
-
-    const vector = end.clone().subtract(start);
-    const length = vector.length();
-    const unit = vector.clone().normalize();
-    const normal = new Phaser.Math.Vector2(-unit.y, unit.x);
-
-    graphics.lineStyle(6, 0x7b5b3d, alpha);
-    for (let index = 0; index < 9; index += 1) {
-      const t = index / 8;
-      const centerX = Phaser.Math.Linear(start.x, end.x, t);
-      const centerY = Phaser.Math.Linear(start.y, end.y, t);
-      const sleeperHalf = 13;
-
-      graphics.lineBetween(
-        centerX - normal.x * sleeperHalf,
-        centerY - normal.y * sleeperHalf,
-        centerX + normal.x * sleeperHalf,
-        centerY + normal.y * sleeperHalf,
-      );
-    }
-
-    const railOffset = 6;
-    graphics.lineStyle(4, 0x53565a, alpha);
-
-    for (const side of [-1, 1]) {
-      const offsetX = normal.x * railOffset * side;
-      const offsetY = normal.y * railOffset * side;
-
-      graphics.lineBetween(
-        start.x + offsetX,
-        start.y + offsetY,
-        start.x + unit.x * length + offsetX,
-        start.y + unit.y * length + offsetY,
-      );
-    }
-  }
-
-  private pointerToGrid(pointer: Phaser.Input.Pointer): GridPoint | null {
-    const world = pointer.positionToCamera(this.cameras.main) as Phaser.Math.Vector2;
-    const gridX = Math.round(world.x / this.tileWidth + world.y / this.tileHeight);
-    const gridY = Math.round(world.y / this.tileHeight - world.x / this.tileWidth);
-
-    if (
-      gridX < 0 ||
-      gridY < 0 ||
-      gridX >= this.gridSize ||
-      gridY >= this.gridSize
-    ) {
-      return null;
-    }
-
-    return { x: gridX, y: gridY };
-  }
-
-  private gridToWorld(gridX: number, gridY: number): Phaser.Math.Vector2 {
-    return new Phaser.Math.Vector2(
-      ((gridX - gridY) * this.tileWidth) / 2,
-      ((gridX + gridY) * this.tileHeight) / 2,
+    if (!inside(cell) || this.tool === "track") return;
+    const occupied = [...this.world.tracks, ...this.world.decorations].some(
+      (d) => same(d, cell),
     );
+    const pos = project(cell);
+    this.preview.save().translateCanvas(pos.x, pos.y);
+    diamond(this.preview, occupied ? 0xcf7563 : 0xfff8db, 0.5);
+    if (this.tool !== "erase" && !occupied) {
+      this.preview.setAlpha(0.65);
+      decoration(this.preview, this.tool);
+    } else this.preview.setAlpha(1);
+    this.preview.restore();
   }
-
-  private diamondPoints(centerX: number, centerY: number): Phaser.Math.Vector2[] {
-    return [
-      new Phaser.Math.Vector2(centerX, centerY - this.tileHeight / 2),
-      new Phaser.Math.Vector2(centerX + this.tileWidth / 2, centerY),
-      new Phaser.Math.Vector2(centerX, centerY + this.tileHeight / 2),
-      new Phaser.Math.Vector2(centerX - this.tileWidth / 2, centerY),
-    ];
+  private tap(p: Phaser.Input.Pointer) {
+    const cell = this.cellAt(p);
+    if (!inside(cell)) return;
+    if (this.tool === "track") {
+      const last = this.world.tracks.at(-1)!;
+      if (same(cell, last) || same(cell, nextCell(last))) {
+        this.selected = true;
+        this.emit();
+      } else {
+        this.selected = false;
+        this.onMessage?.("Yolu uzatmak için en son raya dokun.");
+      }
+      return;
+    }
+    if (this.tool === "erase") {
+      const index = this.world.decorations.findIndex((d) => same(d, cell));
+      if (index >= 0) {
+        this.remember();
+        this.world.decorations.splice(index, 1);
+        this.commit();
+      } else if (same(cell, this.world.tracks.at(-1)!)) this.removeLast();
+      else this.onMessage?.("Bir dekoru veya son ray parçasını seç.");
+      return;
+    }
+    if (
+      [...this.world.tracks, ...this.world.decorations].some((d) =>
+        same(d, cell),
+      )
+    ) {
+      this.onMessage?.("Bu kare dolu. Boş bir kare seç.");
+      return;
+    }
+    this.remember();
+    placeDecoration(this.world, cell, this.tool);
+    this.commit();
   }
 }
