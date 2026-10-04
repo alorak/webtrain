@@ -7,6 +7,13 @@
       content="width=device-width, initial-scale=1.0, viewport-fit=cover"
     />
     <meta name="theme-color" content="#a9c986" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="WebTrain" />
+    <link rel="manifest" href="./manifest.webmanifest" />
+    <link rel="icon" href="./icons/webtrain.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="./icons/webtrain.svg" />
     <meta
       name="description"
       content="Küçük bir dünya, kocaman hayaller. Raylarını döşe, dünyanı süsle ve trenini yola çıkar. Ücretsiz, tarayıcıda çalışan bir tren oyunu."
@@ -168,7 +175,8 @@
         data-icon="trash"
         hidden
       ></button>
-      <div class="view-tools floating">
+      <div id="expand-controls" class="expand-controls" aria-label="Haritayı genişlet"></div>
+            <div class="view-tools floating">
         <button
           id="zoom-in"
           class="icon-button"
@@ -254,7 +262,16 @@
           Hadi başlayalım <span>↗</span>
         </button>
       </dialog>
-      <dialog id="reset-dialog">
+      <dialog id="expand-dialog">
+        <span class="eyebrow">YENİ ALAN</span>
+        <h2>Haritayı genişlet?</h2>
+        <p>Bu yönde yeni bir 24 × 24 oyun alanı açılacak. Emin misin?</p>
+        <div class="dialog-actions">
+          <button id="cancel-expand">İptal</button
+          ><button id="confirm-expand" class="primary">Genişlet</button>
+        </div>
+      </dialog>
+            <dialog id="reset-dialog">
         <span class="eyebrow">YENİ BİR HİKÂYE</span>
         <h2>Yeni bir dünya kur?</h2>
         <p>
