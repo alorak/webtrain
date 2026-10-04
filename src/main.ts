@@ -106,7 +106,7 @@ function refresh(status: GameStatus) {
   $("decor-count").textContent = String(status.world.decorations.length);
   $("zoom-label").textContent = `${Math.round(status.zoom * 100)}%`;
   $("play-label").textContent = status.playing
-    ? "Treni durdur"
+    ? "Duraklat"
     : "Treni çalıştır";
   $("play").firstElementChild!.innerHTML = icon(
     status.playing ? "pause" : "play",
