@@ -49,6 +49,29 @@ function line(
 export function diamond(g: G, color: number, alpha = 1) {
   poly(g, color, [0, -24, 48, 0, 0, 24, -48, 0], alpha);
 }
+
+export function waterTile(g: G, connected: boolean[]) {
+  const top = { x: 0, y: -24 };
+  const right = { x: 48, y: 0 };
+  const bottom = { x: 0, y: 24 };
+  const left = { x: -48, y: 0 };
+
+  poly(g, 0x67b9c7, [0, -24, 48, 0, 0, 24, -48, 0]);
+  poly(g, 0x85ced2, [0, -18, 36, 0, 0, 18, -36, 0], 0.72);
+  g.lineStyle(2, 0xc8e4cf, 0.9);
+  const edges = [
+    [right, bottom],
+    [bottom, left],
+    [left, top],
+    [top, right],
+  ] as const;
+  edges.forEach(([a, b], heading) => {
+    if (!connected[heading]) g.lineBetween(a.x, a.y, b.x, b.y);
+  });
+  g.lineStyle(1.5, 0xdaf3ee, 0.65).lineBetween(-18, -2, -3, -2);
+  g.lineStyle(1.5, 0xdaf3ee, 0.5).lineBetween(8, 7, 25, 7);
+}
+
 export function ground(g: G) {
   for (let y = 0; y < SIZE; y++)
     for (let x = 0; x < SIZE; x++) {
@@ -128,6 +151,28 @@ export function decoration(g: G, kind: DecorationKind) {
     ellipse(g, 0x92bc7d, 1, -65, 34, 31);
     ellipse(g, 0x72a469, 21, -48, 29, 36);
     ellipse(g, 0xa5ca87, -9, -68, 14, 8);
+  } else if (kind === "treeSmall") {
+    line(g, 0x856750, 5, 0, 1, 0, -29);
+    ellipse(g, 0x70a56d, 0, -35, 39, 35);
+    ellipse(g, 0x94bd7d, -10, -41, 23, 21);
+    ellipse(g, 0x5f9562, 12, -34, 22, 25);
+  } else if (kind === "blossom") {
+    line(g, 0x8b6955, 5, 0, 2, 0, -31);
+    ellipse(g, 0x87ad72, 0, -39, 43, 36);
+    for (const [x, y] of [[-14,-43],[1,-51],[14,-40],[-3,-32]]) {
+      ellipse(g, 0xf3b6c4, x, y, 9, 8);
+      ellipse(g, 0xffe1df, x + 2, y - 1, 4, 4);
+    }
+  } else if (kind === "flowers") {
+    ellipse(g, 0x6f9b63, 0, -2, 63, 22);
+    for (const [x, y, c] of [
+      [-22,-8,0xf5b5c8],[-10,-13,0xf4dd69],[3,-8,0xb9a3dd],
+      [18,-12,0xf1987d],[25,-3,0xf4dd69],[-2,-17,0xffffff]
+    ] as const) {
+      line(g, 0x5d8b5d, 2, x, y + 7, x, y);
+      ellipse(g, c, x, y, 8, 7);
+      ellipse(g, 0xf3c85d, x, y, 2.5, 2.5);
+    }
   } else if (kind === "duck") {
     // A wide little pen with intentionally tiny ducks.
     const fence = [
@@ -209,6 +254,25 @@ export function decoration(g: G, kind: DecorationKind) {
       line(g, 0x554e49, 1.8 * scale, x + 5 * scale, y + 6 * scale, x + 5 * scale, y + 13 * scale);
       ellipse(g, 0x1f3430, x + 15 * scale, y - 5 * scale, 1.4 * scale, 1.4 * scale);
     }
+  } else if (kind === "chicken") {
+    const fence = [
+      { x: -38, y: -4 }, { x: 0, y: -23 }, { x: 38, y: -4 }, { x: 0, y: 15 },
+    ];
+    g.lineStyle(2.5, 0xb98955, 0.95).strokePoints(fence, true);
+    g.lineStyle(1.5, 0xe0bd82, 0.95).strokePoints(
+      fence.map((p) => ({ x: p.x, y: p.y - 7 })), true,
+    );
+    for (const p of fence) line(g, 0x9b7048, 3, p.x, p.y + 2, p.x, p.y - 12);
+    for (const [x, y, s, c] of [
+      [-14,-8,1,0xf8f3df],[8,-4,0.82,0xd58a65],[19,4,0.62,0xf2cc57]
+    ] as const) {
+      ellipse(g, c, x, y, 15*s, 11*s);
+      ellipse(g, c, x + 6*s, y - 7*s, 8*s, 8*s);
+      poly(g, 0xe2a13f, [x+10*s,y-7*s,x+16*s,y-5*s,x+10*s,y-3*s]);
+      poly(g, 0xd75c55, [x+4*s,y-12*s,x+7*s,y-17*s,x+9*s,y-11*s]);
+      line(g, 0x8c6748, 1.3, x-3*s, y+5*s, x-4*s, y+11*s);
+      line(g, 0x8c6748, 1.3, x+3*s, y+5*s, x+4*s, y+11*s);
+    }
   } else if (kind === "house") {
     poly(g, 0xf5e9ca, [-27, -9, 5, 7, 5, -33, -27, -47]);
     poly(g, 0xdec9a6, [5, 7, 31, -7, 31, -45, 5, -33]);
@@ -224,11 +288,39 @@ export function decoration(g: G, kind: DecorationKind) {
     g.fillStyle(0xd1b391).fillRect(16, -72, 9, 4);
     ellipse(g, 0x68966a, -26, -2, 17, 10);
     ellipse(g, 0xe9c776, -29, -7, 4, 4);
+  } else if (kind === "houseBlue" || kind === "houseRed" || kind === "cottage") {
+    const roof =
+      kind === "houseBlue" ? 0x588aa8 : kind === "houseRed" ? 0xb85d52 : 0x8c765d;
+    const wall =
+      kind === "houseBlue" ? 0xf4e7c8 : kind === "houseRed" ? 0xf0dfc1 : 0xefe7d2;
+    const scale = kind === "cottage" ? 0.82 : 0.9;
+    g.save().scaleCanvas(scale, scale);
+    poly(g, wall, [-25,-6,4,8,4,-31,-25,-44]);
+    poly(g, 0xd7c39d, [4,8,29,-5,29,-42,4,-31]);
+    poly(g, roof, [-31,-42,-10,-68,36,-46,12,-22]);
+    poly(g, 0x6f7f73, [-17,-10,-8,-6,-8,-25,-17,-30]);
+    poly(g, 0x8ab9c4, [11,-15,21,-20,21,-31,11,-26]);
+    g.restore();
+  } else if (kind === "farmhouse") {
+    g.save().scaleCanvas(0.88, 0.88);
+    poly(g, 0xf2dfb8, [-35,0,1,15,1,-31,-35,-47]);
+    poly(g, 0xd5bd92, [1,15,38,-4,38,-49,1,-31]);
+    poly(g, 0x9d4d45, [-43,-44,-13,-76,48,-51,13,-21]);
+    poly(g, 0xf8efcf, [-8,-3,10,5,10,-27,-8,-35]);
+    poly(g, 0x6e8875, [-28,-9,-18,-4,-18,-25,-28,-31]);
+    poly(g, 0x83b7c1, [20,-17,31,-23,31,-35,20,-29]);
+    g.fillStyle(0xd7b577).fillRoundedRect(-42, -8, 14, 7, 3);
+    g.restore();
   } else if (kind === "mountain") {
     poly(g, 0x71806f, [-42, 4, -14, -55, 4, -23, 22, -70, 46, 4]);
     poly(g, 0x596b63, [4, -23, 22, -70, 46, 4, 18, -7]);
     poly(g, 0xf4f0dc, [9, -42, 22, -70, 31, -43, 23, -48, 18, -39]);
     poly(g, 0x8aa477, [-42, 4, -27, -19, -13, -8, 0, -24, 13, -9, 26, -17, 46, 4]);
+  } else if (kind === "mountainSnow") {
+    poly(g, 0x65736d, [-43,4,-20,-38,-6,-18,12,-70,45,4]);
+    poly(g, 0x4d5f5a, [12,-70,45,4,17,-10,3,-30]);
+    poly(g, 0xf4f0dd, [0,-42,12,-70,24,-43,17,-48,11,-39,6,-45]);
+    poly(g, 0x8da675, [-43,4,-25,-16,-8,-5,5,-21,20,-8,45,4]);
   } else if (kind === "pond") {
     ellipse(g, 0xdbd9ab, 0, -1, 85, 44);
     ellipse(g, 0x5faeb8, 0, -3, 75, 36);
@@ -241,6 +333,18 @@ export function decoration(g: G, kind: DecorationKind) {
     ellipse(g, 0xfff9df, -4, -4, 5, 8);
     poly(g, 0xe4ad53, [-2, -6, 3, -4, -2, -3]);
     ellipse(g, 0x9eaa8a, -33, 7, 10, 7);
+  } else if (kind === "water") {
+    poly(g, 0x67b9c7, [0,-21,42,0,0,21,-42,0]);
+    poly(g, 0x8bd1d4, [0,-15,30,0,0,15,-30,0], 0.8);
+    line(g, 0xe4f7ef, 1.5, -18, -2, -4, -2);
+  } else if (kind === "fountain") {
+    ellipse(g, 0x9db59e, 0, 3, 52, 24);
+    ellipse(g, 0x75bac1, 0, 0, 43, 18);
+    g.fillStyle(0xd4d2bd).fillRoundedRect(-5, -28, 10, 30, 3);
+    ellipse(g, 0xdedcc6, 0, -29, 24, 10);
+    line(g, 0x8ed7dc, 3, 0, -31, 0, -57);
+    g.lineStyle(2, 0xbdebf0).beginPath().moveTo(0,-52).lineTo(-13,-36).strokePath();
+    g.lineStyle(2, 0xbdebf0).beginPath().moveTo(0,-52).lineTo(13,-36).strokePath();
   } else if (kind === "windmill") {
     poly(g, 0xf3e5bd, [-18, 0, 18, 0, 10, -62, -10, -62]);
     poly(g, 0xd5c69d, [5, 0, 18, 0, 10, -62, 4, -62]);
@@ -273,6 +377,77 @@ export function decoration(g: G, kind: DecorationKind) {
     ellipse(g, 0x8a8871, -18, 17, 21, 9);
     poly(g, 0xe6a653, [-25, 17, -19, 2, -14, 12, -10, 6, -11, 18]);
     poly(g, 0xffd883, [-20, 17, -17, 9, -14, 18]);
+  } else if (kind === "carousel") {
+    ellipse(g, 0x765b4c, 0, 2, 62, 22);
+    poly(g, 0xe06d63, [-33,-35,0,-66,33,-35]);
+    poly(g, 0xf7df9a, [-22,-35,0,-66,10,-35]);
+    line(g, 0xc9a15d, 4, 0, 2, 0, -48);
+    for (const x of [-19, 0, 19]) {
+      line(g, 0xd7b86f, 2, x, -31, x, -5);
+      ellipse(g, x === 0 ? 0x8eb5c4 : 0xf2c77e, x, -9, 16, 9);
+      ellipse(g, 0xf4ead4, x + 5, -12, 6, 6);
+    }
+  } else if (kind === "cake") {
+    ellipse(g, 0xe0b88d, 0, 2, 50, 19);
+    g.fillStyle(0xf5cfcb).fillRoundedRect(-22, -27, 44, 28, 8);
+    ellipse(g, 0xffeee0, 0, -27, 44, 13);
+    for (const x of [-12,0,12]) {
+      line(g, 0xe2a05a, 2, x, -33, x, -46);
+      ellipse(g, 0xf5c45b, x, -48, 4, 7);
+    }
+  } else if (kind === "circus") {
+    poly(g, 0xf7e2bd, [-35,4,35,4,25,-43,-25,-43]);
+    poly(g, 0xd95f58, [-35,4,-25,-43,-8,4]);
+    poly(g, 0xd95f58, [8,4,25,-43,35,4]);
+    poly(g, 0xf3d07f, [-29,-43,0,-70,29,-43]);
+    line(g, 0x7a6858, 2, 0, -70, 0, -82);
+    poly(g, 0x6b9f8d, [0,-82,18,-77,0,-72]);
+  } else if (kind === "icecream") {
+    g.fillStyle(0xf5e8ca).fillRoundedRect(-27, -28, 54, 30, 5);
+    poly(g, 0xb7665d, [-31,-28,31,-28,24,-45,-24,-45]);
+    g.fillStyle(0x83a99d).fillRoundedRect(-8,-15,16,17,3);
+    ellipse(g, 0xf2c4c9, -13, -51, 17, 17);
+    ellipse(g, 0xf7df9f, 0, -56, 17, 17);
+    ellipse(g, 0x9fc7b4, 13, -51, 17, 17);
+  } else if (kind === "funhouse") {
+    poly(g, 0xf0d7ae, [-30,1,30,1,30,-43,-30,-43]);
+    poly(g, 0x9c67ad, [-36,-42,0,-70,36,-42]);
+    g.fillStyle(0x79a7b1).fillRoundedRect(-10,-25,20,26,5);
+    for (const x of [-20,20]) ellipse(g, 0xf0a36d, x, -27, 9, 12);
+    ellipse(g, 0xf3d46a, 0, -50, 11, 11);
+  } else if (kind === "gift") {
+    g.fillStyle(0xd85f72).fillRoundedRect(-25,-31,50,33,6);
+    g.fillStyle(0xf4cf68).fillRect(-4,-31,8,33);
+    g.fillStyle(0xf4cf68).fillRect(-25,-18,50,7);
+    ellipse(g, 0x7ca69d, -8, -37, 19, 11);
+    ellipse(g, 0x7ca69d, 8, -37, 19, 11);
+  } else if (kind === "playground") {
+    line(g, 0x7d6856, 4, -26, 2, -17, -36);
+    line(g, 0x7d6856, 4, 9, 2, 0, -36);
+    line(g, 0x7d6856, 3, -17, -36, 0, -36);
+    line(g, 0xd3a958, 2, -12, -34, -12, -8);
+    line(g, 0xd3a958, 2, -5, -34, -5, -8);
+    g.fillStyle(0x69a6b0).fillRoundedRect(-16,-9,15,5,2);
+    poly(g, 0xd97162, [8,2,35,2,10,-31,-2,-31]);
+  } else if (
+    kind === "stationSmall" ||
+    kind === "stationLarge" ||
+    kind === "stationCountry" ||
+    kind === "tunnelStone" ||
+    kind === "tunnelGreen"
+  ) {
+    // Card preview only; in the world these are aligned to the selected track.
+    if (kind.startsWith("tunnel")) {
+      g.fillStyle(kind === "tunnelStone" ? 0x737a72 : 0x6f9a63)
+        .fillRoundedRect(-31,-42,62,44,18);
+      g.fillStyle(0x31443f).fillRoundedRect(-15,-29,30,31,12);
+    } else {
+      const roof = kind === "stationCountry" ? 0xa95c50 : 0x527b83;
+      g.fillStyle(0xe8d9b8).fillRoundedRect(-28,-29,56,30,5);
+      poly(g, roof, [-34,-28,0,-51,34,-28]);
+      g.fillStyle(0x7f6650).fillRoundedRect(-7,-16,14,17,2);
+      g.fillStyle(0xd9c28e).fillRoundedRect(-39,1,78,7,3);
+    }
   } else if (kind === "waterfall") {
     poly(
       g,
@@ -312,6 +487,48 @@ export function decoration(g: G, kind: DecorationKind) {
     line(g, 0x56796e, 5, 16, 7, 30, 7);
   }
 }
+export function trackDecoration(g: G, kind: DecorationKind, track: Track) {
+  const sample = sampleTrack(track, 0.5);
+  const tangent = sample.tangent;
+  const screen = {
+    x: (tangent.x - tangent.y) * 48,
+    y: (tangent.x + tangent.y) * 24,
+  };
+  const angle = Math.atan2(screen.y, screen.x);
+
+  g.save().rotateCanvas(angle);
+  if (kind === "tunnelStone" || kind === "tunnelGreen") {
+    const outer = kind === "tunnelStone" ? 0x747a72 : 0x6f9862;
+    const inner = 0x30433e;
+    g.fillStyle(outer).fillRoundedRect(-34, -47, 68, 56, 18);
+    g.fillStyle(inner).fillRoundedRect(-18, -34, 36, 44, 14);
+    if (kind === "tunnelGreen") {
+      ellipse(g, 0x8eb879, -25, -39, 23, 15);
+      ellipse(g, 0xa0c487, 19, -43, 26, 17);
+    } else {
+      for (const x of [-22, 0, 22]) line(g, 0x959b91, 2, x, -45, x + 4, -31);
+    }
+  } else {
+    const large = kind === "stationLarge";
+    const country = kind === "stationCountry";
+    const width = large ? 82 : 64;
+    g.fillStyle(0xd4bb82).fillRoundedRect(-width / 2, -5, width, 10, 3);
+    g.fillStyle(country ? 0xefe0bb : 0xe7d5ad)
+      .fillRoundedRect(-width * 0.31, -36, width * 0.62, 31, 4);
+    poly(
+      g,
+      country ? 0xaa5c50 : large ? 0x4e7580 : 0x6c8d83,
+      [-width * 0.38, -34, 0, -55, width * 0.38, -34],
+    );
+    g.fillStyle(0x785f4d).fillRoundedRect(-6, -23, 12, 18, 2);
+    if (large) {
+      g.fillStyle(0x88b8c2).fillRoundedRect(-29, -25, 13, 10, 2);
+      g.fillStyle(0x88b8c2).fillRoundedRect(16, -25, 13, 10, 2);
+    }
+  }
+  g.restore();
+}
+
 // A little 3D locomotive: its boxes are projected in the direction of travel.
 export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
   const scale = 0.76;
