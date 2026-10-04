@@ -188,13 +188,17 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     };
 
     const forward = screenVector(heading);
-    const rotation =
-      (Math.atan2(forward.y, forward.x) * 180) / Math.PI + 90;
 
     el.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
       const turn = Number(button.dataset.turn) as Turn;
       const targetHeading = (heading + turn + 4) % 4;
       const direction = screenVector(targetHeading);
+      const targetAngle =
+        (Math.atan2(direction.y, direction.x) * 180) / Math.PI;
+      // Each SVG has a different native arrow-head direction.
+      const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
+      const rotation = targetAngle - nativeAngle;
+
       button.style.setProperty("--turn-x", `${direction.x * radius}px`);
       button.style.setProperty("--turn-y", `${direction.y * radius}px`);
       button.style.setProperty("--turn-rotation", `${rotation}deg`);
