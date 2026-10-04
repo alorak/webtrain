@@ -12,6 +12,7 @@ import {
 } from "./game/saves";
 import {
   MAX_DWELL,
+  isRoadKind,
   vectors,
   type Chunk,
   type ChunkEdge,
@@ -249,6 +250,17 @@ function refresh(status: GameStatus) {
   });
   $<HTMLButtonElement>("undo").disabled = !status.canUndo;
   $<HTMLButtonElement>("redo").disabled = !status.canRedo;
+
+  const roadMode = $("road-mode-panel");
+  const roadActive = isRoadKind(status.tool);
+  roadMode.hidden = !roadActive;
+  if (roadActive) {
+    const source = document.querySelector<HTMLImageElement>(
+      `[data-kind="${status.tool}"] img`,
+    )?.src;
+    if (source) $<HTMLImageElement>("road-mode-image").src = source;
+  }
+
   $("track-count").textContent = String(status.world.tracks.length);
   $("decor-count").textContent = String(status.world.decorations.length);
   $("zoom-label").textContent = `${Math.round(status.zoom * 100)}%`;
@@ -527,6 +539,7 @@ bind("delete-selected", () => requestDelete("decoration"));
 bind("home", () => scene.home());
 bind("zoom-in", () => scene.zoom(1.15));
 bind("zoom-out", () => scene.zoom(1 / 1.15));
+bind("road-mode-toggle", () => scene.setTool("select"));
 
 document
   .querySelectorAll<HTMLButtonElement>("[data-turn]")
