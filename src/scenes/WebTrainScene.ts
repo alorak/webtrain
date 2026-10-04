@@ -42,6 +42,7 @@ import {
   switchThrown,
   toggleSwitch,
   trainPose,
+  vectors,
   type BranchKind,
   type Chunk,
   type ChunkEdge,
@@ -81,7 +82,14 @@ export interface ExpansionAnchor {
 
 // Screen positions of the controls around the selected rail.
 export interface RailControls {
-  end: { x: number; y: number; heading: Heading; can: boolean[]; remove: boolean } | null;
+  end: {
+    x: number;
+    y: number;
+    heading: Heading;
+    can: boolean[];
+    targets: { x: number; y: number }[];
+    remove: boolean;
+  } | null;
   branch: { x: number; y: number; heading: Heading; can: Record<BranchKind, boolean> } | null;
   toggle: { x: number; y: number; thrown: boolean } | null;
 }
@@ -587,10 +595,27 @@ export class WebTrainScene extends Phaser.Scene {
     const controls: RailControls = { ...none };
     if (end) {
       const at = sampleTrack(end.track, end.side === end.track.exit ? 1 : 0).point;
+      const nextCell = {
+        x: end.track.x + vectors[end.side].x,
+        y: end.track.y + vectors[end.side].y,
+      };
+      const turns = [-1, 0, 1] as Turn[];
+      const targets = turns.map((turn) => {
+        // Put each action on the far edge of the next grid cell: left edge,
+        // forward edge, and right edge respectively. This matches where the
+        // new piece would actually end instead of orbiting the current rail end.
+        const previewTrack: Track = {
+          ...nextCell,
+          entry: end.side,
+          exit: ((end.side + turn + 4) % 4) as Heading,
+        };
+        return this.toScreen(project(sampleTrack(previewTrack, 1).point));
+      });
       controls.end = {
         ...this.toScreen(project(at)),
         heading: end.side,
-        can: ([-1, 0, 1] as Turn[]).map((turn) => Boolean(extendCandidate(this.world, end, turn))),
+        can: turns.map((turn) => Boolean(extendCandidate(this.world, end, turn))),
+        targets,
         remove: Boolean(removableTrack(this.world, cell)),
       };
     } else if (pieces.length === 1 && pieces[0].entry === pieces[0].exit) {
