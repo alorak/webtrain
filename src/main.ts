@@ -279,10 +279,8 @@ const bind = (id: string, fn: () => void) =>
   });
 
 bind("panel-nature", () => {
-  const closing = activePanel === "nature";
   togglePanel("nature");
   scene.setTool("select");
-  if (!closing) scene.setTool("select");
 });
 bind("panel-home", () => {
   togglePanel("buildings");
@@ -368,8 +366,16 @@ window.addEventListener("keydown", (e) => {
     if (e.target instanceof HTMLButtonElement) return;
     e.preventDefault();
     scene.setPlaying();
-  } else if (e.key === "1") scene.setTool("track");
-  else if (e.key === "2") scene.setTool(lastDecoration);
-  else if (e.key.toLowerCase() === "e") scene.setTool("erase");
-  else if (e.key === "Escape") scene.setTool("track");
+  } else if (e.key === "1") {
+    setPanel("track");
+    scene.setTool("track");
+  } else if (e.key === "2") {
+    setPanel("nature");
+    scene.setTool("select");
+  } else if (e.key.toLowerCase() === "e") {
+    scene.setTool("erase");
+  } else if (e.key === "Escape") {
+    setPanel(null);
+    scene.setTool("select");
+  }
 });
