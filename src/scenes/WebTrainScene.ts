@@ -45,6 +45,7 @@ export class WebTrainScene extends Phaser.Scene {
   private history: string[] = [];
   private future: string[] = [];
   private scenery: Phaser.GameObjects.Graphics[] = [];
+  private selectedDecorationIndex: number | null = null;
   private rails!: Phaser.GameObjects.Graphics;
   private preview!: Phaser.GameObjects.Graphics;
   private train!: Phaser.GameObjects.Graphics;
@@ -65,6 +66,7 @@ export class WebTrainScene extends Phaser.Scene {
   onChange?: (status: GameStatus) => void;
   onMessage?: (message: string) => void;
   onAnchor?: (x: number, y: number, visible: boolean, blocked: boolean) => void;
+  onDecorationAnchor?: (x: number, y: number, visible: boolean) => void;
 
   constructor() {
     super("WebTrainScene");
@@ -127,6 +129,7 @@ export class WebTrainScene extends Phaser.Scene {
   setTool(tool: Tool) {
     this.tool = tool;
     this.selected = tool === "track";
+    this.selectedDecorationIndex = null;
     this.preview.clear();
     this.emit();
   }
@@ -162,6 +165,15 @@ export class WebTrainScene extends Phaser.Scene {
     this.selected = true;
     this.commit();
   }
+  deleteSelectedDecoration() {
+    const index = this.selectedDecorationIndex;
+    if (index === null || !this.world.decorations[index]) return;
+    this.remember();
+    this.world.decorations.splice(index, 1);
+    this.selectedDecorationIndex = null;
+    this.tool = "select";
+    this.commit();
+  }
   undo() {
     const previous = this.history.pop();
     if (!previous) return;
@@ -176,6 +188,7 @@ export class WebTrainScene extends Phaser.Scene {
   }
   private restore(snapshot: string) {
     const before = this.world.tracks.length + this.world.decorations.length;
+    this.selectedDecorationIndex = null;
     this.world = JSON.parse(snapshot);
     this.commit();
     // A reset changes the whole scene; bring the restored world back into view.
@@ -195,6 +208,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.travelDirection = 1;
     this.tool = "track";
     this.selected = true;
+    this.selectedDecorationIndex = null;
     this.commit();
     this.home();
   }
@@ -211,11 +225,11 @@ export class WebTrainScene extends Phaser.Scene {
     const minY = Math.min(...points.map((p) => p.y)) - (mobile ? 30 : 100),
       maxY = Math.max(...points.map((p) => p.y)) + 30;
     const area = {
-      left: mobile ? 15 : 100,
+      left: mobile ? 12 : 35,
       right:
-        this.scale.width - (mobile ? 120 : this.scale.width < 1000 ? 295 : 350),
-      top: this.scale.height < 550 ? 145 : mobile ? 245 : 235,
-      bottom: this.scale.height - (this.scale.height < 550 ? 105 : 170),
+        this.scale.width - (mobile ? 165 : this.scale.width < 1000 ? 225 : 250),
+      top: this.scale.height < 550 ? 22 : mobile ? 28 : 32,
+      bottom: this.scale.height - (this.scale.height < 550 ? 70 : 92),
     };
     const zoom = Phaser.Math.Clamp(
       Math.min(
@@ -295,7 +309,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.train.clear();
     locomotive(this.train, pose.point, tangent);
     this.train.setDepth(10 + project(pose.point).y);
-    const behind = this.distance - 0.65 * this.travelDirection;
+    const behind = this.distance - 0.52 * this.travelDirection;
     this.carriage.clear();
     if (this.world.closed || (behind > 0 && behind < length)) {
       const car = sampleRoute(this.world.tracks, (behind + length) % length);
@@ -317,6 +331,32 @@ export class WebTrainScene extends Phaser.Scene {
       this.selected && this.tool === "track" && !this.world.closed,
       !candidate(this.world, 0),
     );
+
+    const selectedDecoration =
+      this.selectedDecorationIndex === null
+        ? null
+        : this.world.decorations[this.selectedDecorationIndex];
+    if (selectedDecoration) {
+      const selectedPos = project(selectedDecoration);
+      const selectedX =
+        (selectedPos.x - camera.scrollX - camera.width / 2) * camera.zoom +
+        camera.width / 2;
+      const selectedY =
+        (selectedPos.y - camera.scrollY - camera.height / 2) * camera.zoom +
+        camera.height / 2;
+      const visible =
+        selectedX > 24 &&
+        selectedX < camera.width - 24 &&
+        selectedY > 24 &&
+        selectedY < camera.height - 24;
+      this.onDecorationAnchor?.(
+        selectedX,
+        selectedY - 44 * camera.zoom,
+        visible,
+      );
+    } else {
+      this.onDecorationAnchor?.(0, 0, false);
+    }
   }
   private configureInput() {
     const down = () => this.input.manager.pointers.filter((p) => p.isDown);
@@ -390,7 +430,7 @@ export class WebTrainScene extends Phaser.Scene {
   private previewAt(p: Phaser.Input.Pointer) {
     const cell = this.cellAt(p);
     this.preview.clear();
-    if (!inside(cell) || this.tool === "track") return;
+    if (!inside(cell) || this.tool === "track" || this.tool === "select") return;
     const occupied = [...this.world.tracks, ...this.world.decorations].some(
       (d) => same(d, cell),
     );
@@ -406,9 +446,23 @@ export class WebTrainScene extends Phaser.Scene {
   private tap(p: Phaser.Input.Pointer) {
     const cell = this.cellAt(p);
     if (!inside(cell)) return;
+
+    const decorationIndex = this.world.decorations.findIndex((d) =>
+      same(d, cell),
+    );
+    if (decorationIndex >= 0) {
+      this.selectedDecorationIndex = decorationIndex;
+      this.tool = "select";
+      this.selected = false;
+      this.preview.clear();
+      this.emit();
+      return;
+    }
+
     if (this.tool === "track") {
       const last = this.world.tracks.at(-1)!;
       if (same(cell, last) || same(cell, nextCell(last))) {
+        this.selectedDecorationIndex = null;
         this.selected = true;
         this.emit();
       } else {
@@ -417,26 +471,31 @@ export class WebTrainScene extends Phaser.Scene {
       }
       return;
     }
+
     if (this.tool === "erase") {
-      const index = this.world.decorations.findIndex((d) => same(d, cell));
-      if (index >= 0) {
-        this.remember();
-        this.world.decorations.splice(index, 1);
-        this.commit();
-      } else if (same(cell, this.world.tracks.at(-1)!)) this.removeLast();
-      else this.onMessage?.("Bir dekoru veya son ray parçasını seç.");
+      if (same(cell, this.world.tracks.at(-1)!)) this.removeLast();
+      else this.onMessage?.("Silmek istediğin nesneye dokun.");
       return;
     }
-    if (
-      [...this.world.tracks, ...this.world.decorations].some((d) =>
-        same(d, cell),
-      )
-    ) {
-      this.onMessage?.("Bu kare dolu. Boş bir kare seç.");
+
+    if (this.tool === "select") {
+      this.selectedDecorationIndex = null;
+      this.preview.clear();
+      this.emit();
       return;
     }
+
+    if (this.world.tracks.some((track) => same(track, cell))) {
+      this.onMessage?.("Bu karede ray var. Boş bir kare seç.");
+      return;
+    }
+
     this.remember();
     placeDecoration(this.world, cell, this.tool);
+    // Decoration placement is deliberately one-shot for young players.
+    this.tool = "select";
+    this.selectedDecorationIndex = null;
+    this.selected = false;
     this.commit();
   }
 }

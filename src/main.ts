@@ -43,8 +43,19 @@ const items: {
   color: string;
 }[] = [
   { kind: "tree", name: "Ağaç", category: "nature", color: "sage" },
-  { kind: "duck", name: "Hayvan", category: "nature", color: "sun" },
+  { kind: "pine", name: "Çam", category: "nature", color: "sage" },
+  { kind: "pond", name: "Havuz", category: "nature", color: "blue" },
+  { kind: "waterfall", name: "Şelale", category: "nature", color: "blue" },
+  { kind: "mountain", name: "Dağ", category: "nature", color: "stone" },
+  { kind: "duck", name: "Ördekler", category: "nature", color: "sun" },
+  { kind: "cow", name: "İnek", category: "nature", color: "sand" },
+  { kind: "sheep", name: "Koyun", category: "nature", color: "sand" },
+
   { kind: "house", name: "Ev", category: "buildings", color: "peach" },
+  { kind: "tent", name: "Çadır", category: "buildings", color: "blue" },
+  { kind: "windmill", name: "Yel değirmeni", category: "buildings", color: "sand" },
+  { kind: "ferris", name: "Dönme dolap", category: "buildings", color: "peach" },
+  { kind: "balloon", name: "Balon", category: "buildings", color: "sun" },
 ];
 $("decoration-grid").innerHTML = items
   .map((item) => {
@@ -164,6 +175,23 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
       (b) => (b.disabled = blocked),
     );
   };
+  let previousDecorationAnchor = "";
+  scene.onDecorationAnchor = (x, y, visible) => {
+    const key = `${Math.round(x)},${Math.round(y)},${visible}`;
+    if (key === previousDecorationAnchor) return;
+    previousDecorationAnchor = key;
+    const button = $<HTMLButtonElement>("delete-selected");
+    button.hidden = !visible;
+    if (!visible) return;
+    const panelLeft =
+      document.querySelector(".library")?.getBoundingClientRect().left ??
+      window.innerWidth;
+    const clampedX = Math.max(34, Math.min(panelLeft - 34, x));
+    const clampedY = Math.max(34, Math.min(window.innerHeight - 34, y));
+    button.style.left = `${clampedX}px`;
+    button.style.top = `${clampedY}px`;
+  };
+
   for (const item of items) {
     const g = scene.add.graphics();
     g.save().translateCanvas(48, 104);
@@ -186,13 +214,11 @@ const bind = (id: string, fn: () => void) =>
   });
 bind("panel-nature", () => {
   showPanel("nature");
-  lastDecoration = "tree";
-  scene.setTool("tree");
+  scene.setTool("select");
 });
 bind("panel-home", () => {
   showPanel("buildings");
-  lastDecoration = "house";
-  scene.setTool("house");
+  scene.setTool("select");
 });
 bind("track-tool", () => {
   showPanel("track");
@@ -200,6 +226,7 @@ bind("track-tool", () => {
 });
 bind("train-tool", () => {
   showPanel("train");
+  scene.setTool("select");
   scene.setPlaying();
 });
 bind("play", () => scene.setPlaying());
@@ -212,6 +239,7 @@ bind("speed", () => {
 bind("undo", () => scene.undo());
 bind("redo", () => scene.redo());
 bind("remove-track", () => scene.removeLast());
+bind("delete-selected", () => scene.deleteSelectedDecoration());
 bind("home", () => scene.home());
 bind("zoom-in", () => scene.zoom(1.15));
 bind("zoom-out", () => scene.zoom(1 / 1.15));

@@ -129,24 +129,86 @@ export function decoration(g: G, kind: DecorationKind) {
     ellipse(g, 0x72a469, 21, -48, 29, 36);
     ellipse(g, 0xa5ca87, -9, -68, 14, 8);
   } else if (kind === "duck") {
-    ellipse(g, 0xf8f1d8, -4, -17, 44, 27);
-    ellipse(g, 0xffffff, -9, -21, 34, 23);
-    ellipse(g, 0xf8f1d8, 15, -38, 23, 23);
-    ellipse(g, 0xffffff, 12, -41, 17, 17);
-    poly(g, 0xe3a64a, [25, -40, 39, -35, 25, -31]);
-    ellipse(g, 0x2f4b43, 17, -43, 3.5, 3.5);
-    poly(g, 0xe9c66b, [-24, -19, -35, -28, -30, -12]);
-    line(g, 0xc88446, 2, -10, -4, -12, 6);
-    line(g, 0xc88446, 2, 4, -4, 3, 6);
-    line(g, 0xc88446, 2, -17, 6, -7, 6);
-    line(g, 0xc88446, 2, -2, 6, 8, 6);
+    // A wide little pen with intentionally tiny ducks.
+    const fence = [
+      { x: -38, y: -4 },
+      { x: 0, y: -23 },
+      { x: 38, y: -4 },
+      { x: 0, y: 15 },
+    ];
+    g.lineStyle(2.5, 0xb98955, 0.95).strokePoints(fence, true);
+    g.lineStyle(1.5, 0xe0bd82, 0.95).strokePoints(
+      fence.map((p) => ({ x: p.x, y: p.y - 7 })),
+      true,
+    );
+    for (const p of fence) line(g, 0x9b7048, 3, p.x, p.y + 2, p.x, p.y - 12);
 
-    ellipse(g, 0xf4d46b, 31, -3, 20, 16);
-    ellipse(g, 0xf7dd83, 36, -15, 13, 13);
-    poly(g, 0xe0a044, [43, -15, 50, -12, 43, -9]);
-    ellipse(g, 0x355048, 38, -17, 2.5, 2.5);
-    line(g, 0xc88446, 1.5, 29, 5, 28, 11);
-    line(g, 0xc88446, 1.5, 35, 5, 35, 11);
+    ellipse(g, 0xffffff, -8, -9, 13, 8);
+    ellipse(g, 0xffffff, -3, -15, 7, 7);
+    poly(g, 0xe1a33d, [1, -15, 7, -13, 1, -11]);
+    ellipse(g, 0x314943, -1, -17, 1.5, 1.5);
+    line(g, 0xc7803c, 1, -10, -5, -11, -1);
+    line(g, 0xc7803c, 1, -5, -5, -5, -1);
+
+    for (const [x, y] of [
+      [10, -3],
+      [20, 2],
+      [5, 5],
+    ]) {
+      ellipse(g, 0xf6d45e, x, y, 7, 5);
+      ellipse(g, 0xf8df7a, x + 2, y - 4, 4.5, 4.5);
+      poly(g, 0xd99736, [x + 4, y - 4, x + 8, y - 3, x + 4, y - 2]);
+    }
+  } else if (kind === "cow") {
+    const fence = [
+      { x: -38, y: -4 },
+      { x: 0, y: -23 },
+      { x: 38, y: -4 },
+      { x: 0, y: 15 },
+    ];
+    g.lineStyle(2.5, 0xb98955, 0.95).strokePoints(fence, true);
+    g.lineStyle(1.5, 0xe0bd82, 0.95).strokePoints(
+      fence.map((p) => ({ x: p.x, y: p.y - 7 })),
+      true,
+    );
+    for (const p of fence) line(g, 0x9b7048, 3, p.x, p.y + 2, p.x, p.y - 12);
+
+    ellipse(g, 0xf4efe3, -2, -8, 35, 19);
+    ellipse(g, 0xf6f0e4, 16, -13, 15, 13);
+    ellipse(g, 0x5c5149, -10, -12, 11, 8);
+    ellipse(g, 0x5c5149, 2, -4, 9, 7);
+    ellipse(g, 0x5c5149, 18, -16, 6, 5);
+    line(g, 0x5e5046, 2, -12, 0, -13, 10);
+    line(g, 0x5e5046, 2, -1, 0, -1, 10);
+    line(g, 0x5e5046, 2, 8, 0, 9, 9);
+    poly(g, 0xb99a6d, [20, -20, 25, -25, 23, -18]);
+    poly(g, 0xb99a6d, [12, -20, 8, -25, 10, -18]);
+    ellipse(g, 0x2c403b, 20, -15, 1.8, 1.8);
+  } else if (kind === "sheep") {
+    const fence = [
+      { x: -38, y: -4 },
+      { x: 0, y: -23 },
+      { x: 38, y: -4 },
+      { x: 0, y: 15 },
+    ];
+    g.lineStyle(2.5, 0xb98955, 0.95).strokePoints(fence, true);
+    g.lineStyle(1.5, 0xe0bd82, 0.95).strokePoints(
+      fence.map((p) => ({ x: p.x, y: p.y - 7 })),
+      true,
+    );
+    for (const p of fence) line(g, 0x9b7048, 3, p.x, p.y + 2, p.x, p.y - 12);
+
+    for (const [x, y, scale] of [
+      [-9, -8, 1],
+      [17, 2, 0.72],
+    ] as const) {
+      ellipse(g, 0xf4f0dd, x, y, 28 * scale, 18 * scale);
+      ellipse(g, 0xffffff, x - 6 * scale, y - 5 * scale, 15 * scale, 13 * scale);
+      ellipse(g, 0x554e49, x + 13 * scale, y - 3 * scale, 10 * scale, 9 * scale);
+      line(g, 0x554e49, 1.8 * scale, x - 7 * scale, y + 6 * scale, x - 7 * scale, y + 13 * scale);
+      line(g, 0x554e49, 1.8 * scale, x + 5 * scale, y + 6 * scale, x + 5 * scale, y + 13 * scale);
+      ellipse(g, 0x1f3430, x + 15 * scale, y - 5 * scale, 1.4 * scale, 1.4 * scale);
+    }
   } else if (kind === "house") {
     poly(g, 0xf5e9ca, [-27, -9, 5, 7, 5, -33, -27, -47]);
     poly(g, 0xdec9a6, [5, 7, 31, -7, 31, -45, 5, -33]);
@@ -162,6 +224,11 @@ export function decoration(g: G, kind: DecorationKind) {
     g.fillStyle(0xd1b391).fillRect(16, -72, 9, 4);
     ellipse(g, 0x68966a, -26, -2, 17, 10);
     ellipse(g, 0xe9c776, -29, -7, 4, 4);
+  } else if (kind === "mountain") {
+    poly(g, 0x71806f, [-42, 4, -14, -55, 4, -23, 22, -70, 46, 4]);
+    poly(g, 0x596b63, [4, -23, 22, -70, 46, 4, 18, -7]);
+    poly(g, 0xf4f0dc, [9, -42, 22, -70, 31, -43, 23, -48, 18, -39]);
+    poly(g, 0x8aa477, [-42, 4, -27, -19, -13, -8, 0, -24, 13, -9, 26, -17, 46, 4]);
   } else if (kind === "pond") {
     ellipse(g, 0xdbd9ab, 0, -1, 85, 44);
     ellipse(g, 0x5faeb8, 0, -3, 75, 36);
@@ -247,12 +314,13 @@ export function decoration(g: G, kind: DecorationKind) {
 }
 // A little 3D locomotive: its boxes are projected in the direction of travel.
 export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
+  const scale = 0.76;
   const p = (forward: number, side: number, height: number) => {
     const pos = project({
-      x: point.x + tangent.x * forward - tangent.y * side,
-      y: point.y + tangent.y * forward + tangent.x * side,
+      x: point.x + (tangent.x * forward - tangent.y * side) * scale,
+      y: point.y + (tangent.y * forward + tangent.x * side) * scale,
     });
-    return { x: pos.x, y: pos.y - height };
+    return { x: pos.x, y: pos.y - height * scale };
   };
   const face = (color: number, coords: [number, number, number][]) => {
     g.fillStyle(color).fillPoints(
@@ -327,12 +395,12 @@ export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
     ]);
   };
   const center = project(point);
-  ellipse(g, 0x365044, center.x, center.y + 3, 40, 14, 0.2);
+  ellipse(g, 0x365044, center.x, center.y + 2, 31, 11, 0.18);
   for (const f of [-0.23, 0.2])
     for (const s of [-0.18, 0.18]) {
       const wheel = p(f, s, 3);
-      ellipse(g, 0x344d47, wheel.x, wheel.y, 9, 10);
-      ellipse(g, 0xccc5a1, wheel.x, wheel.y, 4, 4);
+      ellipse(g, 0x344d47, wheel.x, wheel.y, 7, 8);
+      ellipse(g, 0xccc5a1, wheel.x, wheel.y, 3, 3);
     }
   box(-0.36, 0.36, 0.17, 5, 10, [0xdeae69, 0xba7855, 0x986047]);
   if (wagon) {
@@ -351,5 +419,5 @@ export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
       [-0.25, s, 31],
     ]);
   const light = p(0.31, 0, 19);
-  ellipse(g, 0xffe6a0, light.x, light.y, 7, 7);
+  ellipse(g, 0xffe6a0, light.x, light.y, 5, 5);
 }
