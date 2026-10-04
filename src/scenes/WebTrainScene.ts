@@ -571,11 +571,15 @@ export class WebTrainScene extends Phaser.Scene {
 
     if (this.tool !== "erase" && canPlace) {
       this.preview.setAlpha(0.68);
+      const roadKind =
+        this.tool === "roadAsphalt" || this.tool === "roadDirt"
+          ? this.tool
+          : null;
       if (overlay && trackAtCell) trackDecoration(this.preview, this.tool, trackAtCell);
       else if (this.tool === "water")
         waterTile(this.preview, [false, false, false, false]);
-      else if (this.tool === "roadAsphalt" || this.tool === "roadDirt")
-        roadTile(this.preview, this.tool, [false, false, false, false]);
+      else if (roadKind)
+        roadTile(this.preview, roadKind, [false, false, false, false]);
       else decoration(this.preview, this.tool);
     } else {
       this.preview.setAlpha(1);
