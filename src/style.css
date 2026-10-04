@@ -1164,3 +1164,119 @@ kbd {
 .track-actions .remove-track {
   transform: translateY(var(--anchor-y-offset, 0px));
 }
+
+
+/* Full-screen map mode: keep the world visible edge-to-edge and reduce chrome. */
+.topbar,
+.world-caption,
+.map-note {
+  display: none !important;
+}
+
+.library {
+  top: 16px;
+  bottom: 16px;
+}
+
+.history-tools {
+  top: 16px;
+  left: 16px;
+  right: auto;
+}
+
+.bottom-bar {
+  left: 18px;
+  right: auto;
+  bottom: max(18px, env(safe-area-inset-bottom));
+  width: auto;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: block;
+}
+
+.bottom-bar .hint,
+.bottom-bar .world-stats,
+#speed {
+  display: none !important;
+}
+
+.train-controls {
+  display: block;
+}
+
+#play {
+  min-height: 48px;
+  padding: 12px 18px;
+  border-radius: 14px;
+}
+
+.view-tools {
+  left: 18px;
+  bottom: 84px;
+}
+
+#toast {
+  bottom: 82px;
+}
+
+@media (max-width: 759px) {
+  .library {
+    top: 8px;
+    bottom: 8px;
+    right: 8px;
+  }
+
+  .history-tools {
+    top: 10px;
+    left: 10px;
+  }
+
+  .bottom-bar {
+    left: 10px;
+    right: auto;
+    bottom: max(10px, env(safe-area-inset-bottom));
+    height: auto;
+    padding: 0;
+    flex-wrap: nowrap;
+  }
+
+  #play {
+    min-height: 46px;
+    padding: 11px 14px;
+    font-size: 11px;
+    border-radius: 12px;
+  }
+
+  .view-tools {
+    left: 10px;
+    bottom: 72px;
+  }
+
+  #toast {
+    bottom: 68px;
+  }
+}
+
+@media (max-height: 550px) and (min-width: 760px) {
+  .library {
+    top: 12px;
+    bottom: 12px;
+  }
+
+  .history-tools {
+    top: 12px;
+  }
+
+  .bottom-bar {
+    height: auto;
+    bottom: 12px;
+  }
+
+  .view-tools {
+    bottom: 78px;
+  }
+}
