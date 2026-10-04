@@ -3227,3 +3227,127 @@ button.game-logo:focus-visible {
     overflow-y: auto;
   }
 }
+
+
+/* Smaller map controls + road mode chip */
+.history-tools.map-controls {
+  top: 12px;
+  left: 12px;
+  min-width: 122px;
+  padding: 5px 6px 6px;
+  border-radius: 16px;
+  gap: 4px;
+}
+
+.map-control-row .icon-button {
+  width: 32px;
+  height: 30px;
+  border-radius: 9px;
+}
+
+.map-control-row svg {
+  width: 16px;
+  height: 16px;
+}
+
+.map-control-row--zoom {
+  min-height: 30px;
+}
+
+.map-control-row--zoom #zoom-label {
+  min-width: 34px;
+  padding: 0 2px;
+  font-size: 9px;
+}
+
+.map-control-divider {
+  margin: 0 1px;
+}
+
+.road-mode-panel {
+  position: fixed;
+  z-index: 18;
+  top: 94px;
+  left: 12px;
+  width: 122px;
+  padding: 5px;
+  border-radius: 15px;
+  background: rgb(255 253 245 / 92%);
+  border: 1px solid rgb(255 255 255 / 76%);
+  box-shadow: 0 6px 18px rgb(49 79 43 / 14%);
+  backdrop-filter: blur(8px);
+}
+
+.road-mode-button {
+  width: 100%;
+  min-height: 42px;
+  padding: 3px;
+  border: 1px solid rgb(73 104 72 / 15%);
+  border-radius: 11px;
+  display: grid;
+  place-items: center;
+  background: #eef2e5;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / 55%);
+}
+
+.road-mode-button:hover,
+.road-mode-button:focus-visible {
+  background: #e7eddb;
+  border-color: rgb(63 116 86 / 34%);
+}
+
+.road-mode-button img {
+  width: 54px;
+  height: 34px;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+@media (max-width: 759px) {
+  .history-tools.map-controls {
+    top: 8px;
+    left: 8px;
+    min-width: 114px;
+    padding: 4px 5px 5px;
+    border-radius: 15px;
+    gap: 3px;
+  }
+
+  .map-control-row .icon-button {
+    width: 30px;
+    height: 28px;
+    border-radius: 8px;
+  }
+
+  .map-control-row svg {
+    width: 15px;
+    height: 15px;
+  }
+
+  .map-control-row--zoom {
+    min-height: 28px;
+  }
+
+  .map-control-row--zoom #zoom-label {
+    min-width: 32px;
+    font-size: 9px;
+  }
+
+  .road-mode-panel {
+    top: 84px;
+    left: 8px;
+    width: 114px;
+    padding: 4px;
+    border-radius: 14px;
+  }
+
+  .road-mode-button {
+    min-height: 38px;
+    border-radius: 10px;
+  }
+
+  .road-mode-button img {
+    width: 49px;
+    height: 31px;
+  }
+}
