@@ -2,9 +2,13 @@ import Phaser from "phaser";
 import {
   appendTrack,
   candidate,
+  CHUNK_SIZE,
   createWorld,
+  expandChunk,
+  exposedChunkEdges,
   inside,
   isTrackOverlayKind,
+  neighboringChunk,
   nextCell,
   parseWorld,
   placeDecoration,
@@ -13,6 +17,8 @@ import {
   sampleTrack,
   STORAGE_KEY,
   trackLength,
+  type Chunk,
+  type ChunkEdge,
   type Point,
   type Tool,
   type Turn,
@@ -29,6 +35,15 @@ import {
   unproject,
   waterTile,
 } from "../game/art";
+
+export interface ExpansionAnchor {
+  chunk: Chunk;
+  edge: ChunkEdge;
+  x: number;
+  y: number;
+  rotation: number;
+  visible: boolean;
+}
 
 export interface GameStatus {
   world: World;
@@ -49,6 +64,7 @@ export class WebTrainScene extends Phaser.Scene {
   private future: string[] = [];
   private scenery: Phaser.GameObjects.Graphics[] = [];
   private selectedDecorationIndex: number | null = null;
+  private floor!: Phaser.GameObjects.Graphics;
   private rails!: Phaser.GameObjects.Graphics;
   private preview!: Phaser.GameObjects.Graphics;
   private train!: Phaser.GameObjects.Graphics;
@@ -70,6 +86,7 @@ export class WebTrainScene extends Phaser.Scene {
   onMessage?: (message: string) => void;
   onAnchor?: (x: number, y: number, visible: boolean, blocked: boolean) => void;
   onDecorationAnchor?: (x: number, y: number, visible: boolean) => void;
+  onExpansionAnchors?: (anchors: ExpansionAnchor[]) => void;
 
   constructor() {
     super("WebTrainScene");
@@ -81,8 +98,8 @@ export class WebTrainScene extends Phaser.Scene {
     } catch {
       this.saved = false;
     }
-    const floor = this.add.graphics();
-    ground(floor);
+    this.floor = this.add.graphics().setDepth(0);
+    ground(this.floor, this.world.chunks);
     this.rails = this.add.graphics().setDepth(1);
     this.marker = this.add.graphics().setDepth(2);
     this.preview = this.add.graphics().setDepth(2000);
@@ -180,6 +197,16 @@ export class WebTrainScene extends Phaser.Scene {
     this.tool = "select";
     this.commit();
   }
+  expandWorld(chunk: Chunk, edge: ChunkEdge) {
+    this.remember();
+    if (!expandChunk(this.world, chunk, edge)) {
+      this.history.pop();
+      return;
+    }
+    this.selectedDecorationIndex = null;
+    this.commit();
+    this.home();
+  }
   undo() {
     const previous = this.history.pop();
     if (!previous) return;
@@ -205,6 +232,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.remember();
     this.world = {
       version: 1,
+      chunks: [{ x: 0, y: 0 }],
       tracks: [{ x: 8, y: 9, entry: 0, exit: 0 }],
       decorations: [],
       closed: false,
@@ -221,11 +249,20 @@ export class WebTrainScene extends Phaser.Scene {
   home() {
     const camera = this.cameras.main;
     const mobile = this.scale.width < 760;
-    const points = (
-      mobile
-        ? this.world.tracks
-        : [...this.world.tracks, ...this.world.decorations]
-    ).map(project);
+    const chunkCorners = this.world.chunks.flatMap((chunk) => {
+      const minX = chunk.x * CHUNK_SIZE - 0.5;
+      const minY = chunk.y * CHUNK_SIZE - 0.5;
+      const maxX = (chunk.x + 1) * CHUNK_SIZE - 0.5;
+      const maxY = (chunk.y + 1) * CHUNK_SIZE - 0.5;
+      return [
+        { x: minX, y: minY },
+        { x: maxX, y: minY },
+        { x: maxX, y: maxY },
+        { x: minX, y: maxY },
+      ].map(project);
+    });
+    const objectPoints = [...this.world.tracks, ...this.world.decorations].map(project);
+    const points = [...chunkCorners, ...objectPoints];
     const minX = Math.min(...points.map((p) => p.x)) - 45,
       maxX = Math.max(...points.map((p) => p.x)) + 45;
     const minY = Math.min(...points.map((p) => p.y)) - (mobile ? 30 : 100),
@@ -271,6 +308,7 @@ export class WebTrainScene extends Phaser.Scene {
     if (track) drawTrack(this.preview, track, 0.6);
   }
   private drawWorld() {
+    ground(this.floor, this.world.chunks);
     this.rails.clear();
     for (const track of this.world.tracks) drawTrack(this.rails, track);
     this.scenery.forEach((g) => g.destroy());
@@ -385,6 +423,53 @@ export class WebTrainScene extends Phaser.Scene {
     } else {
       this.onDecorationAnchor?.(0, 0, false);
     }
+
+    if (this.onExpansionAnchors) {
+      const anchors: ExpansionAnchor[] = exposedChunkEdges(this.world).map(
+        ({ chunk, edge }) => {
+          const minX = chunk.x * CHUNK_SIZE - 0.5;
+          const minY = chunk.y * CHUNK_SIZE - 0.5;
+          const maxX = (chunk.x + 1) * CHUNK_SIZE - 0.5;
+          const maxY = (chunk.y + 1) * CHUNK_SIZE - 0.5;
+          const midpoint =
+            edge === "x-"
+              ? { x: minX, y: (minY + maxY) / 2 }
+              : edge === "x+"
+                ? { x: maxX, y: (minY + maxY) / 2 }
+                : edge === "y-"
+                  ? { x: (minX + maxX) / 2, y: minY }
+                  : { x: (minX + maxX) / 2, y: maxY };
+          const next = neighboringChunk(chunk, edge);
+          const nextCenter = {
+            x: next.x * CHUNK_SIZE + CHUNK_SIZE / 2 - 0.5,
+            y: next.y * CHUNK_SIZE + CHUNK_SIZE / 2 - 0.5,
+          };
+          const worldPoint = project(midpoint);
+          const worldNext = project(nextCenter);
+          const screenX =
+            (worldPoint.x - camera.scrollX - camera.width / 2) * camera.zoom +
+            camera.width / 2;
+          const screenY =
+            (worldPoint.y - camera.scrollY - camera.height / 2) * camera.zoom +
+            camera.height / 2;
+          const dx = worldNext.x - worldPoint.x;
+          const dy = worldNext.y - worldPoint.y;
+          return {
+            chunk,
+            edge,
+            x: screenX,
+            y: screenY,
+            rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
+            visible:
+              screenX > 26 &&
+              screenX < camera.width - 26 &&
+              screenY > 26 &&
+              screenY < camera.height - 26,
+          };
+        },
+      );
+      this.onExpansionAnchors(anchors);
+    }
   }
   private configureInput() {
     const down = () => this.input.manager.pointers.filter((p) => p.isDown);
@@ -458,7 +543,7 @@ export class WebTrainScene extends Phaser.Scene {
   private previewAt(p: Phaser.Input.Pointer) {
     const cell = this.cellAt(p);
     this.preview.clear();
-    if (!inside(cell) || this.tool === "track" || this.tool === "select") return;
+    if (!inside(cell, this.world) || this.tool === "track" || this.tool === "select") return;
 
     const decorationAtCell = this.world.decorations.some((d) => same(d, cell));
     const trackAtCell = this.world.tracks.find((track) => same(track, cell));
@@ -486,7 +571,7 @@ export class WebTrainScene extends Phaser.Scene {
   }
   private tap(p: Phaser.Input.Pointer) {
     const cell = this.cellAt(p);
-    if (!inside(cell)) return;
+    if (!inside(cell, this.world)) return;
 
     const decorationIndex = this.world.decorations.findIndex((d) =>
       same(d, cell),
