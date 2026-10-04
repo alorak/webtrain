@@ -73,7 +73,9 @@ export type DecorationKind =
   | "stationLarge"
   | "stationCountry"
   | "tunnelStone"
-  | "tunnelGreen";
+  | "tunnelGreen"
+  | "bufferStop"
+  | "levelCrossing";
 
 export type Tool = "select" | "track" | "erase" | DecorationKind;
 
@@ -129,17 +131,19 @@ export function connectedDecorationEdges(
 // Roads join any neighbouring road, whatever its surface; each side gives
 // the neighbour's kind, or null where there is none.
 export function roadNeighbours(
-  world: Pick<World, "decorations">,
+  world: Pick<World, "decorations" | "tracks">,
   cell: Point,
 ): (RoadKind | null)[] {
-  return vectors.map((vector) => {
+  return vectors.map((vector, side) => {
+    const next = { x: cell.x + vector.x, y: cell.y + vector.y };
     const road = world.decorations.find(
-      (d) =>
-        isRoadKind(d.kind) &&
-        d.x === cell.x + vector.x &&
-        d.y === cell.y + vector.y,
+      (d) => (isRoadKind(d.kind) || d.kind === "levelCrossing") && same(d, next),
     );
-    return road ? (road.kind as RoadKind) : null;
+    if (!road) return null;
+    if (road.kind !== "levelCrossing") return road.kind as RoadKind;
+    // A level crossing is a dirt road that crosses its rail at right angles.
+    const rail = world.tracks.find((t) => same(t, next));
+    return rail && (side - rail.entry) % 2 !== 0 ? "roadDirt" : null;
   });
 }
 
@@ -294,6 +298,8 @@ export const kinds: DecorationKind[] = [
   "stationCountry",
   "tunnelStone",
   "tunnelGreen",
+  "bufferStop",
+  "levelCrossing",
 ];
 
 export const trackOverlayKinds: DecorationKind[] = [
@@ -302,6 +308,8 @@ export const trackOverlayKinds: DecorationKind[] = [
   "stationCountry",
   "tunnelStone",
   "tunnelGreen",
+  "bufferStop",
+  "levelCrossing",
 ];
 
 export const grassKinds = ["grassLight", "grassDark"] as const;
@@ -432,11 +440,12 @@ export function activePiece(world: World, cell: Point): Track {
 
 export function extendCandidate(world: World, end: RailEnd, turn: Turn): Track | null {
   if (linked(world, end.track, end.side).length) return null;
+  if (bufferAt(world, end.track)) return null;
   const cell = step(end.track, end.side);
   if (
     !inside(cell, world) ||
     world.tracks.some((p) => same(p, cell)) ||
-    world.decorations.some((p) => same(p, cell) && !isGroundLayer(p.kind))
+    world.decorations.some((p) => same(p, cell) && !isGroundLayer(p.kind) && !bridgeable(p.kind))
   )
     return null;
   return { ...cell, entry: end.side, exit: ((end.side + turn + 4) % 4) as Heading };
@@ -472,7 +481,8 @@ export function branchCandidate(world: World, cell: Point, kind: BranchKind): Tr
   const exit = (heading + (kind.endsWith("Right") ? 1 : 3)) % 4;
   const next = step(cell, exit);
   if (!inside(next, world)) return null;
-  if (world.decorations.some((d) => same(d, next) && !isGroundLayer(d.kind))) return null;
+  if (world.decorations.some((d) => same(d, next) && !isGroundLayer(d.kind) && !bridgeable(d.kind)))
+    return null;
   const there = piecesAt(world, next);
   if (there.length && !there.some((t) => sidesOf(t).includes(((exit + 2) % 4) as Heading)))
     return null;
@@ -611,7 +621,10 @@ export function advanceTrain(
   for (let guard = 0; guard < 64; guard++) {
     const side = exitSide(track, forward);
     const next = nextPiece(world, track, side, prefer);
-    const limit = next || stopAtEnd ? 1 : 1 - 0.12 / trackLength(track);
+    // At a dead end the train turns a little before the edge; a buffer
+    // keeps it further back so it stops against the buffer.
+    const margin = bufferAt(world, track) ? 0.42 : 0.12;
+    const limit = next || stopAtEnd ? 1 : 1 - margin / trackLength(track);
     if (u <= limit) break;
     const overflow = (u - limit) * trackLength(track);
     if (!next) {
@@ -628,6 +641,19 @@ export function advanceTrain(
     u = overflow / trackLength(track);
   }
   return { track: index, forward, t: forward ? u : 1 - u };
+}
+
+// Rails laid over water become a bridge.
+export const bridgeable = (kind: DecorationKind) => kind === "water";
+export const isBridge = (world: Pick<World, "decorations">, cell: Point) =>
+  world.decorations.some((d) => d.kind === "water" && same(d, cell));
+export const crossingAt = (world: Pick<World, "decorations">, cell: Point) =>
+  world.decorations.some((d) => d.kind === "levelCrossing" && same(d, cell));
+export const bufferAt = (world: Pick<World, "decorations">, cell: Point) =>
+  world.decorations.some((d) => d.kind === "bufferStop" && same(d, cell));
+// The end of a piece a buffer closes: its loose end, else its exit.
+export function bufferSide(world: World, track: Track): Heading {
+  return openEnds(world).find((e) => e.track === track)?.side ?? track.exit;
 }
 
 // Stations stop trains at the middle of their piece of rail.
@@ -709,11 +735,14 @@ export function placeDecoration(
     return true;
   }
 
-  const pieces = world.tracks.filter((p) => same(p, cell)).length;
+  const pieces = world.tracks.filter((p) => same(p, cell));
   if (isTrackOverlayKind(kind)) {
     // Stations and tunnels need a plain piece of rail, not a switch.
-    if (pieces !== 1) return false;
-  } else if (pieces) {
+    if (pieces.length !== 1) return false;
+    // A level crossing needs a straight rail; a buffer a loose end to close.
+    if (kind === "levelCrossing" && pieces[0].entry !== pieces[0].exit) return false;
+    if (kind === "bufferStop" && !openEnds(world).some((e) => e.track === pieces[0])) return false;
+  } else if (pieces.length && !bridgeable(kind)) {
     return false;
   }
 
@@ -798,7 +827,12 @@ export function parseWorld(raw: string | null): World | null {
       decorationCells.add(key);
       if (isGroundLayer(d.kind)) continue;
       const pieces = trackCells.get(cell) ?? 0;
-      if (isTrackOverlayKind(d.kind) ? pieces !== 1 : pieces > 0) return null;
+      if (isTrackOverlayKind(d.kind) ? pieces !== 1 : pieces > 0 && !bridgeable(d.kind)) return null;
+      if (
+        d.kind === "levelCrossing" &&
+        data.tracks.some((t: Track) => same(t, d) && t.entry !== t.exit)
+      )
+        return null;
       if (d.closed !== undefined || d.dwell !== undefined || d.name !== undefined) {
         if (!isStationKind(d.kind)) return null;
         if (d.closed !== undefined && typeof d.closed !== "boolean") return null;

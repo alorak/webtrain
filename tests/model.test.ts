@@ -1,6 +1,9 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  bufferSide,
+  crossingAt,
+  isBridge,
   addBranch,
   advanceTrain,
   appendTrack,
@@ -413,4 +416,51 @@ test("station settings are validated when loading", () => {
   ];
   for (const decoration of bad)
     assert.equal(parseWorld(JSON.stringify({ ...base, decorations: [decoration] })), null);
+});
+
+test("buffers close a loose end and keep the train back from it", () => {
+  const world = line();
+  // Only the loose ends of the line take a buffer.
+  assert.equal(placeDecoration(world, { x: 9, y: 8 }, "bufferStop"), false);
+  assert.ok(placeDecoration(world, { x: 10, y: 8 }, "bufferStop"));
+  assert.equal(bufferSide(world, world.tracks[2]), 0);
+  // The buffered end can no longer be extended.
+  assert.equal(candidate(world, 0), null);
+  // Without a buffer the train turns 0.12 before the end (at t = 0.88),
+  // with one 0.42 before it (at 0.58); either way it then runs back.
+  const free = advanceTrain(line(), { track: 2, forward: true, t: 0.5 }, 0.5)!;
+  const held = advanceTrain(world, { track: 2, forward: true, t: 0.5 }, 0.5)!;
+  assert.equal(free.forward, false);
+  assert.ok(Math.abs(free.t - 0.76) < 1e-9);
+  assert.ok(Math.abs(held.t - 0.16) < 1e-9);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+});
+
+test("level crossings sit on straight rail and carry a road across it", () => {
+  const world = line();
+  appendTrack(world, 1);
+  assert.equal(placeDecoration(world, { x: 11, y: 8 }, "levelCrossing"), false);
+  assert.ok(placeDecoration(world, { x: 9, y: 8 }, "levelCrossing"));
+  assert.ok(crossingAt(world, { x: 9, y: 8 }));
+  assert.ok(placeDecoration(world, { x: 9, y: 9 }, "roadDirt"));
+  assert.ok(placeDecoration(world, { x: 9, y: 7 }, "roadAsphalt"));
+  // Roads above and below join it; the rail's own neighbours do not.
+  assert.deepEqual(roadNeighbours(world, { x: 9, y: 9 }), [null, null, null, "roadDirt"]);
+  assert.deepEqual(roadNeighbours(world, { x: 9, y: 7 }), [null, "roadDirt", null, null]);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  const curved = structuredClone(world);
+  curved.decorations[0] = { x: 11, y: 8, kind: "levelCrossing" };
+  assert.equal(parseWorld(JSON.stringify(curved)), null);
+});
+
+test("rails laid over water become a bridge", () => {
+  const world = line();
+  for (const x of [11, 12]) assert.ok(placeDecoration(world, { x, y: 8 }, "water"));
+  assert.ok(appendTrack(world, 0));
+  assert.ok(appendTrack(world, 0));
+  assert.ok(isBridge(world, { x: 12, y: 8 }));
+  // Water can also be painted under rail that is already there.
+  assert.ok(placeDecoration(world, { x: 9, y: 8 }, "water"));
+  assert.equal(placeDecoration(world, { x: 10, y: 8 }, "house"), false);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
 });

@@ -55,8 +55,14 @@ import {
   type TrainState,
   type Turn,
   type World,
+  bufferAt,
+  bufferSide,
+  crossingAt,
+  isBridge,
 } from "../game/model";
 import {
+  bridgeLayers,
+  bridgeRails,
   decoration,
   diamond,
   drawTrack,
@@ -66,6 +72,7 @@ import {
   roadTile,
   trackDecoration,
   trackDecorationLayers,
+  type StructureLayer,
   unproject,
   grassTile,
   waterTile,
@@ -112,6 +119,14 @@ export class WebTrainScene extends Phaser.Scene {
   private history: string[] = [];
   private future: string[] = [];
   private scenery: Phaser.GameObjects.Graphics[] = [];
+  // Level crossings animate their barriers when a train comes near.
+  private crossings: {
+    cell: Point;
+    track: Track;
+    layers: { g: Phaser.GameObjects.Graphics; layer: StructureLayer }[];
+    gate: number;
+    blink: number;
+  }[] = [];
   private selectedDecorationIndex: number | null = null;
   private floor!: Phaser.GameObjects.Graphics;
   private rails!: Phaser.GameObjects.Graphics;
@@ -237,7 +252,11 @@ export class WebTrainScene extends Phaser.Scene {
   extend(turn: Turn) {
     const end = this.railEnd();
     if (!end || !extendCandidate(this.world, end, turn)) {
-      this.onMessage?.("Burada yer yok. Başka bir yön seç.");
+      this.onMessage?.(
+        end && bufferAt(this.world, end.track)
+          ? "Bu uçta tampon var. Uzatmak için önce tamponu kaldır."
+          : "Burada yer yok. Başka bir yön seç.",
+      );
       return;
     }
     this.remember();
@@ -427,11 +446,24 @@ export class WebTrainScene extends Phaser.Scene {
     this.rails.clear();
     // At a switch the route not taken is drawn first and faded.
     const idle = (t: Track) => isSwitch(this.world, t) && activePiece(this.world, t) !== t;
-    for (const track of this.world.tracks.filter(idle)) drawTrack(this.rails, track, 0.5);
+    const surface = (t: Track) =>
+      isBridge(this.world, t) ? "bridge" : crossingAt(this.world, t) ? "crossing" : "ballast";
+    for (const track of this.world.tracks.filter(idle))
+      drawTrack(this.rails, track, 0.5, surface(track));
     for (const track of this.world.tracks.filter((t) => !idle(t)))
-      drawTrack(this.rails, track);
+      drawTrack(this.rails, track, 1, surface(track));
     this.scenery.forEach((g) => g.destroy());
+    this.crossings = [];
     const extra: Phaser.GameObjects.Graphics[] = [];
+    // Railings on bridges, one each side of the train.
+    for (const track of this.world.tracks.filter((t) => isBridge(this.world, t))) {
+      const p = project(track);
+      for (const { layer, depth } of bridgeLayers(track)) {
+        const g = this.add.graphics({ x: p.x, y: p.y }).setDepth(10 + p.y + depth);
+        bridgeRails(g, track, layer);
+        extra.push(g);
+      }
+    }
     this.scenery = this.world.decorations.map((d) => {
       const p = project(d);
       const isWater = d.kind === "water";
@@ -453,12 +485,29 @@ export class WebTrainScene extends Phaser.Scene {
       } else if (isOverlay) {
         // Stations and tunnels split into layers so trains pass between them.
         const track = this.world.tracks.find((t) => same(t, d));
+        const end = track && bufferSide(this.world, track) === track.exit ? 1 : 0;
+        const crossing =
+          track && d.kind === "levelCrossing"
+            ? { cell: { x: d.x, y: d.y }, track, layers: [] as { g: Phaser.GameObjects.Graphics; layer: StructureLayer }[], gate: 1, blink: -1 }
+            : null;
+        if (crossing && track) {
+          // The road runs across the rail at right angles, under the rails.
+          const road = this.add.graphics({ x: p.x, y: p.y }).setDepth(0.72);
+          roadTile(
+            road,
+            "roadDirt",
+            [0, 1, 2, 3].map((side) => ((side - track.entry) % 2 ? "roadDirt" : null)),
+          );
+          extra.push(road);
+          this.crossings.push(crossing);
+        }
         if (track)
-          trackDecorationLayers(d.kind, track).forEach(({ layer, depth }, i) => {
+          trackDecorationLayers(d.kind, track, end).forEach(({ layer, depth }, i) => {
             const target =
               i === 0 ? g : this.add.graphics({ x: p.x, y: p.y });
             target.setDepth(10 + p.y + depth);
-            trackDecoration(target, d.kind, track, layer);
+            trackDecoration(target, d.kind, track, layer, { end });
+            crossing?.layers.push({ g: target, layer });
             if (i > 0) extra.push(target);
           });
       } else {
@@ -495,6 +544,24 @@ export class WebTrainScene extends Phaser.Scene {
     target
       .getContext("2d")
       ?.drawImage(source, camera.x * ratio, camera.y * ratio, width, height, 0, 0, width, height);
+  }
+  // Lowers the barriers while the train is close, and flashes the lights.
+  private animateCrossings(time: number, delta: number, train: Point[]) {
+    for (const crossing of this.crossings) {
+      const close = train.some(
+        (p) => Math.hypot(p.x - crossing.cell.x, p.y - crossing.cell.y) < 1.4,
+      );
+      const target = close ? 0 : 1;
+      const gate = crossing.gate + (target - crossing.gate) * Math.min(1, delta / 160);
+      const blink = close || gate < 0.98 ? Math.floor(time / 380) % 2 : -1;
+      if (Math.abs(gate - crossing.gate) < 0.002 && blink === crossing.blink) continue;
+      crossing.gate = Math.abs(gate - target) < 0.002 ? target : gate;
+      crossing.blink = blink;
+      for (const { g, layer } of crossing.layers) {
+        g.clear();
+        trackDecoration(g, "levelCrossing", crossing.track, layer, { gate: crossing.gate, blink });
+      }
+    }
   }
   // Whether the train is still waiting at an open station.
   private heldAtStation(time: number) {
@@ -666,11 +733,14 @@ export class WebTrainScene extends Phaser.Scene {
       { stopAtEnd: true, prefer: this.trail },
     );
     this.carriage.clear();
+    const near: Point[] = [pose.point];
     if (behind) {
       const car = trainPose(this.world, behind);
       locomotive(this.carriage, car.point, { x: -car.tangent.x, y: -car.tangent.y }, true);
       this.carriage.setDepth(10 + project(car.point).y);
+      near.push(car.point);
     }
+    this.animateCrossings(time, delta, near);
     const camera = this.cameras.main;
     this.onRailControls?.(this.railControls());
 
@@ -844,7 +914,7 @@ export class WebTrainScene extends Phaser.Scene {
           ? !groundAtCell
           : overlay
             ? Boolean(trackAtCell) && !objectAtCell
-            : !trackAtCell && !objectAtCell;
+            : (!trackAtCell || this.tool === "water") && !objectAtCell;
 
     const pos = project(cell);
     this.preview.save().translateCanvas(pos.x, pos.y);
@@ -936,9 +1006,13 @@ export class WebTrainScene extends Phaser.Scene {
     if (!placed) {
       this.history.pop();
       this.onMessage?.(
-        overlay
-          ? "İstasyon ve tünelleri bir ray parçasının üstüne yerleştir."
-          : "Buraya eklenemiyor. Boş bir kare seç.",
+        kind === "bufferStop"
+          ? "Tamponu bir rayın açık ucuna koy."
+          : kind === "levelCrossing"
+            ? "Hemzemin geçidi düz bir rayın üstüne koy."
+            : overlay
+              ? "İstasyon ve tünelleri bir ray parçasının üstüne yerleştir."
+              : "Buraya eklenemiyor. Boş bir kare seç.",
       );
       return;
     }

@@ -220,7 +220,10 @@ export function ground(g: G, chunks: Chunk[]) {
       }
   }
 }
-export function drawTrack(g: G, track: Track, alpha = 1) {
+// What a piece of rail is laid on: ballast, a bridge deck over water, or
+// the plank deck of a level crossing.
+export type TrackSurface = "ballast" | "bridge" | "crossing";
+export function drawTrack(g: G, track: Track, alpha = 1, surface: TrackSurface = "ballast") {
   const points = Array.from({ length: 25 }, (_, i) =>
     sampleTrack(track, i / 24),
   );
@@ -228,21 +231,42 @@ export function drawTrack(g: G, track: Track, alpha = 1) {
     points.map(({ point: p, tangent: v }) =>
       project({ x: p.x - v.y * offset, y: p.y + v.x * offset }),
     );
-  g.fillStyle(0x657949, 0.14 * alpha).fillPoints(
-    [...edge(0.29), ...edge(-0.29).reverse()],
-    true,
-  );
-  g.fillStyle(0xe5d5a9, alpha).fillPoints(
-    [...edge(0.25), ...edge(-0.25).reverse()],
-    true,
-  );
-  for (let i = 1; i < 24; i += 3) {
-    const { point: p, tangent: v } = points[i];
-    const a = project({ x: p.x - v.y * 0.2, y: p.y + v.x * 0.2 });
-    const b = project({ x: p.x + v.y * 0.2, y: p.y - v.x * 0.2 });
-    g.lineStyle(5, 0x82664d, alpha).lineBetween(a.x, a.y, b.x, b.y);
-    g.lineStyle(1, 0xb29368, alpha).lineBetween(a.x, a.y - 1, b.x, b.y - 1);
+  const strip = (inner: number, outer: number) => [...edge(inner), ...edge(outer).reverse()];
+  const down = (pts: { x: number; y: number }[], by: number) => pts.map((p) => ({ x: p.x, y: p.y + by }));
+  if (surface === "bridge") {
+    // Stone piers under a timber deck whose edges drop towards the water.
+    for (const i of [6, 18])
+      for (const offset of [-0.24, 0.24]) {
+        const [p] = [edge(offset)[i]];
+        g.lineStyle(5, 0x8f8a7c, alpha).lineBetween(p.x, p.y + 6, p.x, p.y + 20);
+        g.lineStyle(1.5, 0xb3ae9e, alpha).lineBetween(p.x - 1.5, p.y + 6, p.x - 1.5, p.y + 20);
+      }
+    for (const offset of [-0.33, 0.33])
+      g.fillStyle(0x6f4e36, alpha).fillPoints([...edge(offset), ...down(edge(offset), 7).reverse()], true);
+    g.fillStyle(0xa77a50, alpha).fillPoints(strip(0.33, -0.33), true);
+    for (let i = 0; i <= 24; i += 2) {
+      const { point: p, tangent: v } = points[i];
+      const a = project({ x: p.x - v.y * 0.33, y: p.y + v.x * 0.33 });
+      const b = project({ x: p.x + v.y * 0.33, y: p.y - v.x * 0.33 });
+      g.lineStyle(1, 0x8a6142, alpha).lineBetween(a.x, a.y, b.x, b.y);
+    }
+  } else if (surface === "crossing") {
+    // Planks between and beside the rails so the road runs over them.
+    g.fillStyle(0x6f6255, alpha).fillPoints(strip(0.22, -0.22), true);
+    for (const offset of [-0.17, 0, 0.17])
+      g.lineStyle(1, 0x8a7c6c, alpha).strokePoints(edge(offset), false);
+  } else {
+    g.fillStyle(0x657949, 0.14 * alpha).fillPoints(strip(0.29, -0.29), true);
+    g.fillStyle(0xe5d5a9, alpha).fillPoints(strip(0.25, -0.25), true);
   }
+  if (surface !== "crossing")
+    for (let i = 1; i < 24; i += 3) {
+      const { point: p, tangent: v } = points[i];
+      const a = project({ x: p.x - v.y * 0.2, y: p.y + v.x * 0.2 });
+      const b = project({ x: p.x + v.y * 0.2, y: p.y - v.x * 0.2 });
+      g.lineStyle(5, 0x82664d, alpha).lineBetween(a.x, a.y, b.x, b.y);
+      g.lineStyle(1, 0xb29368, alpha).lineBetween(a.x, a.y - 1, b.x, b.y - 1);
+    }
   for (const offset of [-0.135, 0.135]) {
     const rail = edge(offset);
     g.lineStyle(4, 0x505c53, alpha).strokePoints(rail, false);
@@ -251,6 +275,36 @@ export function drawTrack(g: G, track: Track, alpha = 1) {
       false,
     );
   }
+}
+
+// Bridge railings, split so the train passes between the far and near one.
+export function bridgeRails(g: G, track: Track, layer: StructureLayer) {
+  const origin = project(track);
+  const at = (t: number, offset: number, z: number) => {
+    const { point: p, tangent: v } = sampleTrack(track, t);
+    const q = project({ x: p.x - v.y * offset, y: p.y + v.x * offset });
+    return { x: q.x - origin.x, y: q.y - origin.y - z };
+  };
+  const [far, near] = [-0.34, 0.34].sort((a, b) => at(0.5, a, 0).y - at(0.5, b, 0).y);
+  for (const offset of layer === "back" ? [far] : layer === "front" ? [near] : [far, near]) {
+    for (let i = 0; i <= 6; i++) {
+      const a = at(i / 6, offset, 0);
+      g.lineStyle(2, 0x6f4e36).lineBetween(a.x, a.y, a.x, a.y - 8);
+    }
+    for (const z of [4, 8])
+      g.lineStyle(z === 8 ? 2 : 1.4, z === 8 ? 0x8a6142 : 0x7d5a3c).strokePoints(
+        Array.from({ length: 13 }, (_, i) => at(i / 12, offset, z)),
+        false,
+      );
+  }
+}
+export function bridgeLayers(track: Track) {
+  const origin = project(track).y;
+  const ys = [0, 0.5, 1].map((t) => project(sampleTrack(track, t).point).y - origin);
+  return [
+    { layer: "back" as StructureLayer, depth: Math.min(...ys) - 2 },
+    { layer: "front" as StructureLayer, depth: Math.max(...ys) + 2 },
+  ];
 }
 // Buildings are drawn as little boxes: x/y in tile units from the cell centre,
 // z in pixels. The +y face (screen left) is lit, the +x face (screen right) is in shade.
@@ -1514,8 +1568,9 @@ export function decoration(g: G, kind: DecorationKind, context: ModelContext = {
   if (isTrackOverlayKind(kind)) {
     // Cards show the structure on a straight piece of rail.
     const track: Track = { x: 0, y: 0, entry: 0, exit: 0 };
-    drawTrack(g, track);
-    trackDecoration(g, kind, track);
+    if (kind === "levelCrossing") roadTile(g, "roadDirt", [null, "roadDirt", null, "roadDirt"]);
+    drawTrack(g, track, 1, kind === "levelCrossing" ? "crossing" : "ballast");
+    trackDecoration(g, kind, track, "all", { gate: 0, blink: 0 });
     return;
   }
   // A road in front of the door is carried up to it; otherwise a footpath.
@@ -1619,7 +1674,7 @@ function railFrame(track: Track): Frame {
 
 // How a structure splits around the train: each layer with its depth offset
 // from the cell, so a train in the cell passes between them.
-export function trackDecorationLayers(kind: DecorationKind, track: Track) {
+export function trackDecorationLayers(kind: DecorationKind, track: Track, end: 0 | 1 = 1) {
   const origin = project(track).y;
   const ys = [0, 0.25, 0.5, 0.75, 1].map(
     (t) => project(sampleTrack(track, t).point).y - origin,
@@ -1627,6 +1682,14 @@ export function trackDecorationLayers(kind: DecorationKind, track: Track) {
   const [low, high] = [Math.min(...ys), Math.max(...ys)];
   if (kind === "tunnelStone" || kind === "tunnelGreen")
     return [{ layer: "all" as StructureLayer, depth: high + 1 }];
+  // A buffer sorts by its own end, so a train stopping against it is behind
+  // or in front of it as it should be.
+  if (kind === "bufferStop") return [{ layer: "all" as StructureLayer, depth: ys[end * 4] + 1 }];
+  if (kind === "levelCrossing")
+    return [
+      { layer: "back" as StructureLayer, depth: low - 2 },
+      { layer: "front" as StructureLayer, depth: high + 2 },
+    ];
   // On the outside of a bend that faces the viewer the station is in front.
   const s = railFrame(track).side(0.5);
   const behind = s.x + s.y <= 1e-6;
@@ -1639,15 +1702,91 @@ export function trackDecorationLayers(kind: DecorationKind, track: Track) {
   return [{ layer: "back" as StructureLayer, depth: under }];
 }
 
+// end: which end of the piece a buffer closes. gate: 0 lowered .. 1 raised
+// barrier arms of a level crossing; blink: which warning light is lit.
+export interface RailExtras {
+  end?: 0 | 1;
+  gate?: number;
+  blink?: number;
+}
 export function trackDecoration(
   g: G,
   kind: DecorationKind,
   track: Track,
   layer: StructureLayer = "all",
+  extras: RailExtras = {},
 ) {
   const frame = railFrame(track);
   if (kind === "tunnelStone" || kind === "tunnelGreen") tunnel(g, frame, kind === "tunnelGreen");
+  else if (kind === "bufferStop") buffer(g, frame, extras.end ?? 1);
+  else if (kind === "levelCrossing") crossingGates(g, frame, layer, extras.gate ?? 1, extras.blink ?? -1);
   else station(g, frame, kind, layer);
+}
+
+// A chunky red buffer across the loose end of a rail, with studs on top
+// and two bumpers facing the train.
+function buffer(g: G, frame: Frame, end: 0 | 1) {
+  const { at } = frame;
+  const { box } = sweepTools(g, frame);
+  const [t0, t1] = end ? [0.82, 0.97] : [0.03, 0.18];
+  const inner = end ? t0 : t1;
+  const toward = end ? -1 : 1;
+  box(t0, t1, -0.25, 0.25, 0, 13, 0xd9574e, 0xe8705f);
+  for (const b of [-0.12, 0.12]) {
+    const [x, y] = at((t0 + t1) / 2, b, 13);
+    cylinder(g, x, y, 4.5, 2.3, 3, 0xc04a3e, 0xef8576);
+  }
+  for (const b of [-0.13, 0.13]) {
+    const [x, y] = at(inner + toward * 0.03, b, 7);
+    ellipse(g, 0xa63d33, x, y, 8, 8);
+    ellipse(g, 0xe8705f, x - 1, y - 1, 5, 5);
+  }
+}
+
+// Barrier arms, crossbuck signs and warning lights of a level crossing.
+// The road crosses the rail, so each arm lies along the rail to close the
+// road on one side of the track.
+function crossingGates(g: G, frame: Frame, layer: StructureLayer, gate: number, blink: number) {
+  const { at } = frame;
+  const gates = [
+    { side: 0.38, post: 0.92, toward: -1 },
+    { side: -0.38, post: 0.08, toward: 1 },
+  ].sort((a, b) => at(a.post, a.side, 0)[1] - at(b.post, b.side, 0)[1]);
+  const shown = layer === "back" ? [gates[0]] : layer === "front" ? [gates[1]] : gates;
+  const angle = (Math.PI / 2) * Math.min(1, Math.max(0, gate));
+  for (const { side, post, toward } of shown) {
+    const [px, py] = at(post, side, 0);
+    line(g, 0x4c5a52, 2.5, px, py, px, py - 26);
+    // Crossbuck sign.
+    const [sx, sy] = [px, py - 25];
+    for (const [dx, dy] of [[5, 3], [5, -3]]) {
+      line(g, 0xffffff, 3.2, sx - dx, sy - dy, sx + dx, sy + dy);
+      line(g, 0xd9574e, 1.2, sx - dx, sy - dy, sx + dx, sy + dy);
+    }
+    // Warning lights, lit in turn while a train is near.
+    for (const [i, dx] of [[0, -3.5], [1, 3.5]] as const) {
+      ellipse(g, 0x2f3a36, px + dx, py - 17, 5.5, 5.5);
+      ellipse(g, blink === i ? 0xff6b52 : 0x6b3a33, px + dx, py - 17, 3.6, 3.6);
+    }
+    // The arm swings from upright (raised) down across the road.
+    const length = 0.6;
+    const pivot = at(post, side, 11);
+    const tip = at(post + toward * length * Math.cos(angle), side, 11 + length * 54 * Math.sin(angle));
+    for (let k = 0; k < 6; k++) {
+      const a = k / 6;
+      const b = (k + 1) / 6;
+      line(
+        g,
+        k % 2 ? 0xffffff : 0xd9574e,
+        3,
+        pivot[0] + (tip[0] - pivot[0]) * a,
+        pivot[1] + (tip[1] - pivot[1]) * a,
+        pivot[0] + (tip[0] - pivot[0]) * b,
+        pivot[1] + (tip[1] - pivot[1]) * b,
+      );
+    }
+    ellipse(g, 0x4c5a52, pivot[0], pivot[1], 5, 5);
+  }
 }
 
 function sweepTools(g: G, { at, side, tangent }: Frame) {
