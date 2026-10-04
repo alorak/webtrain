@@ -73,6 +73,59 @@ export function waterTile(g: G, connected: boolean[]) {
   g.lineStyle(1.5, 0xdaf3ee, 0.5).lineBetween(8, 7, 25, 7);
 }
 
+export function roadTile(
+  g: G,
+  kind: "roadAsphalt" | "roadDirt",
+  connected: boolean[],
+) {
+  const endpoints = [
+    { x: 24, y: 12 },
+    { x: -24, y: 12 },
+    { x: -24, y: -12 },
+    { x: 24, y: -12 },
+  ];
+
+  let headings = connected
+    .map((value, index) => (value ? index : -1))
+    .filter((index) => index >= 0);
+
+  // A single placed road still reads as a useful path. Once a neighbour is
+  // added, both cells automatically align to the shared grid direction.
+  if (headings.length === 0) headings = [0, 2];
+  else if (headings.length === 1)
+    headings = [headings[0], (headings[0] + 2) % 4];
+
+  const asphalt = kind === "roadAsphalt";
+  const outer = asphalt ? 0x7f857f : 0xa98155;
+  const inner = asphalt ? 0x555c58 : 0xc69a67;
+
+  for (const heading of headings) {
+    const end = endpoints[heading];
+    g.lineStyle(asphalt ? 18 : 19, outer, 0.96);
+    g.lineBetween(0, 0, end.x, end.y);
+  }
+  ellipse(g, outer, 0, 0, asphalt ? 19 : 20, asphalt ? 13 : 14, 0.96);
+
+  for (const heading of headings) {
+    const end = endpoints[heading];
+    g.lineStyle(asphalt ? 13 : 14, inner, 1);
+    g.lineBetween(0, 0, end.x, end.y);
+  }
+  ellipse(g, inner, 0, 0, asphalt ? 14 : 15, asphalt ? 9 : 10);
+
+  if (asphalt) {
+    g.lineStyle(1.4, 0xe8e3c5, 0.8);
+    for (const heading of headings) {
+      const end = endpoints[heading];
+      g.lineBetween(end.x * 0.28, end.y * 0.28, end.x * 0.48, end.y * 0.48);
+      g.lineBetween(end.x * 0.68, end.y * 0.68, end.x * 0.84, end.y * 0.84);
+    }
+  } else {
+    ellipse(g, 0xb78355, -5, -1, 3, 2, 0.7);
+    ellipse(g, 0xdfb985, 7, 2, 4, 2, 0.65);
+  }
+}
+
 export function ground(g: G, chunks: Chunk[]) {
   g.clear();
   for (const chunk of chunks) {
@@ -139,6 +192,10 @@ export function drawTrack(g: G, track: Track, alpha = 1) {
   }
 }
 export function decoration(g: G, kind: DecorationKind) {
+  if (kind === "roadAsphalt" || kind === "roadDirt") {
+    roadTile(g, kind, [true, false, true, false]);
+    return;
+  }
   ellipse(g, 0x47694b, 7, 3, kind === "waterfall" ? 92 : 62, 22, 0.16);
   if (kind === "pine") {
     g.fillStyle(0x86634e).fillRoundedRect(-4, -31, 8, 34, 2);

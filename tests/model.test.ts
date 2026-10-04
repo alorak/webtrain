@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   appendTrack,
   candidate,
+  connectedDecorationEdges,
   createWorld,
   expandChunk,
   exposedChunkEdges,
@@ -121,6 +122,27 @@ test("tracks can continue across an expanded chunk boundary", () => {
     entry: 0,
     exit: 0,
   });
+});
+
+test("adjacent asphalt and dirt roads connect only to their own kind", () => {
+  const world = fresh();
+  assert.equal(placeDecoration(world, { x: 9, y: 9 }, "roadAsphalt"), true);
+  assert.equal(placeDecoration(world, { x: 10, y: 9 }, "roadAsphalt"), true);
+  assert.equal(placeDecoration(world, { x: 9, y: 10 }, "roadDirt"), true);
+
+  assert.deepEqual(
+    connectedDecorationEdges(world, { x: 9, y: 9 }, "roadAsphalt"),
+    [true, false, false, false],
+  );
+  assert.deepEqual(
+    connectedDecorationEdges(world, { x: 10, y: 9 }, "roadAsphalt"),
+    [false, false, true, false],
+  );
+  assert.deepEqual(
+    connectedDecorationEdges(world, { x: 9, y: 10 }, "roadDirt"),
+    [false, false, false, false],
+  );
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
 });
 
 test("rail infrastructure can occupy a track but ordinary scenery cannot", () => {

@@ -2266,3 +2266,23 @@ kbd {
     min-width: 58px;
   }
 }
+
+
+/* Sidebar breathing room */
+.library {
+  top: 10px;
+  bottom: 10px;
+  height: auto;
+}
+
+.decoration-grid {
+  height: 100%;
+}
+
+@media (max-width: 759px) {
+  .library {
+    top: 7px;
+    bottom: 7px;
+    height: auto;
+  }
+}
