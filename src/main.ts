@@ -444,16 +444,27 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     if (end && !actions.hidden) {
       const anchor = place(actions, end.x, end.y);
       const forward = screenVector(end.heading);
+      const minimumArrowRadius = window.innerWidth < 760 ? 64 : 72;
       actions.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
         const turn = Number(button.dataset.turn) as Turn;
         const direction = screenVector(end.heading + turn);
         const target = end.targets[turn + 1];
-        // Each SVG has a different native arrow-head direction. Position is
-        // no longer an arbitrary radius: it is the actual far-edge midpoint
-        // of the next grid cell for that left/straight/right choice.
+        const rawX = target.x - anchor.x;
+        const rawY = target.y - anchor.y;
+        const rawRadius = Math.hypot(rawX, rawY) || 1;
+
+        // At close zoom levels the exact future edge midpoint is ideal.
+        // When zoomed out those three edge midpoints collapse toward each
+        // other on screen, so keep their real angles but push them outward
+        // just enough to preserve a comfortable touch gap.
+        const spread = Math.max(1, minimumArrowRadius / rawRadius);
+        const offsetX = rawX * spread;
+        const offsetY = rawY * spread;
+
+        // Each SVG has a different native arrow-head direction.
         const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
-        button.style.setProperty("--turn-x", `${target.x - anchor.x}px`);
-        button.style.setProperty("--turn-y", `${target.y - anchor.y}px`);
+        button.style.setProperty("--turn-x", `${offsetX}px`);
+        button.style.setProperty("--turn-y", `${offsetY}px`);
         button.style.setProperty("--turn-rotation", `${angle(direction) - nativeAngle}deg`);
         button.disabled = !end.can[turn + 1];
       });
