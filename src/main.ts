@@ -226,6 +226,7 @@ bind("track-tool", () => {
 });
 bind("train-tool", () => {
   showPanel("train");
+  scene.setTool("select");
   scene.setPlaying();
 });
 bind("play", () => scene.setPlaying());
