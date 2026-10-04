@@ -49,6 +49,9 @@ const paths: Record<string, string> = {
   hand: '<path d="M8 12V5a2 2 0 0 1 4 0v7-9a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v9c0 5-3 7-7 7-3 0-5-2-7-5l-3-5a2 2 0 0 1 3-2l2 2Z"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  edit: '<path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4"/>',
+  eyeOff:
+    '<path d="M3 3l18 18M10.6 10.6a2 2 0 0 0 2.8 2.8M9.8 4.2A10.8 10.8 0 0 1 21 12a13 13 0 0 1-2.2 3.2M6.6 6.6A12.7 12.7 0 0 0 3 12s3.5 6 9 6c1.1 0 2.1-.2 3-.6"/>',
   save: '<path d="M5 3h11l3 3v15H5Z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
   folder: '<path d="M3 6h7l2 2h9v11H3Z"/>',
   download: '<path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/>',
@@ -204,13 +207,78 @@ function toast(message: string) {
 // Station panel (left): live view of the station, open/closed lights and
 // how long trains wait there.
 const stationPanel = $("station-panel");
+const stationChip = $("station-chip");
 let stationCell: Point | null = null;
 let stationTimer = 0;
+let stationCollapsed = false;
+let stationEditing = false;
+
+const sameCell = (a: Point | null, b: Point | null) =>
+  Boolean(a && b && a.x === b.x && a.y === b.y);
+
+function stationDefaultName(kind: DecorationKind) {
+  return items.find((item) => item.kind === kind)?.name ?? "İstasyon";
+}
+
+function stationDisplayName() {
+  if (!scene || !stationCell) return "İstasyon";
+  const info = scene.stationInfo(stationCell);
+  return info?.name || (info ? stationDefaultName(info.kind) : "İstasyon");
+}
+
+function setStationEditing(editing: boolean) {
+  stationEditing = editing;
+  const title = $("station-title");
+  const input = $<HTMLInputElement>("station-name-input");
+  const button = $<HTMLButtonElement>("rename-station");
+  title.hidden = editing;
+  input.hidden = !editing;
+  button.innerHTML = icon(editing ? "check" : "edit");
+  button.setAttribute(
+    "aria-label",
+    editing ? "İstasyon adını kaydet" : "İstasyon adını değiştir",
+  );
+  button.title = editing ? "Kaydet" : "Adını değiştir";
+  if (editing) {
+    input.value = stationDisplayName();
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }
+}
+
+function startStationTimer() {
+  clearInterval(stationTimer);
+  if (!stationCell || stationCollapsed) return;
+  stationTimer = window.setInterval(renderStation, 250);
+}
+
+function setStationCollapsed(collapsed: boolean) {
+  if (!stationCell) return;
+  stationCollapsed = collapsed;
+  stationPanel.hidden = collapsed;
+  stationChip.hidden = !collapsed;
+  if (collapsed) {
+    setStationEditing(false);
+    clearInterval(stationTimer);
+    scene?.setStationView(null);
+    $("station-chip-name").textContent = stationDisplayName();
+  } else {
+    stationChip.hidden = true;
+    renderStation();
+    requestAnimationFrame(placeStationView);
+    startStationTimer();
+  }
+}
+
 function renderStation() {
   if (!scene || !stationCell) return;
   const info = scene.stationInfo(stationCell);
   if (!info) return;
-  $("station-title").textContent = items.find((i) => i.kind === info.kind)?.name ?? "İstasyon";
+  const name = info.name || stationDefaultName(info.kind);
+  if (!stationEditing) $("station-title").textContent = name;
+  $("station-chip-name").textContent = name;
   for (const [id, active] of [["station-open", !info.closed], ["station-closed", info.closed]] as const) {
     $(id).classList.toggle("active", active);
     $(id).setAttribute("aria-pressed", String(active));
@@ -226,8 +294,12 @@ function renderStation() {
       : `Trenler ${info.dwell} sn bekler`;
   $("station-status").classList.toggle("waiting", info.waiting);
 }
+
 function placeStationView() {
-  if (!scene || !stationCell) return;
+  if (!scene || !stationCell || stationCollapsed || stationPanel.hidden) {
+    scene?.setStationView(null);
+    return;
+  }
   const rect = $("station-view").getBoundingClientRect();
   scene.setStationView(
     rect.width ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height } : null,
@@ -317,13 +389,28 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
   scene = ready;
   scene.onChange = refresh;
   scene.onStation = (cell) => {
+    const previous = stationCell;
     stationCell = cell;
-    stationPanel.hidden = !cell;
     clearInterval(stationTimer);
-    if (!cell) return;
+    setStationEditing(false);
+
+    if (!cell) {
+      stationCollapsed = false;
+      stationPanel.hidden = true;
+      stationChip.hidden = true;
+      scene.setStationView(null);
+      return;
+    }
+
+    // Selecting any station opens the full card. This also makes a second
+    // tap on the same collapsed station restore it.
+    stationCollapsed = false;
+    stationPanel.hidden = false;
+    stationChip.hidden = true;
+    if (!sameCell(previous, cell)) scene.setStationView(null);
     renderStation();
     requestAnimationFrame(placeStationView);
-    stationTimer = window.setInterval(renderStation, 250);
+    startStationTimer();
   };
   scene.onMessage = toast;
   let previousRail = "";
@@ -564,6 +651,28 @@ document
   });
 bind("switch-toggle", () => scene.toggleSelectedSwitch());
 bind("close-station", () => scene.selectStation(null));
+bind("hide-station", () => setStationCollapsed(true));
+bind("station-chip", () => setStationCollapsed(false));
+bind("rename-station", () => {
+  if (!stationCell) return;
+  if (!stationEditing) {
+    setStationEditing(true);
+    return;
+  }
+  const value = $<HTMLInputElement>("station-name-input").value;
+  scene.setStationSettings({ name: value });
+  setStationEditing(false);
+  renderStation();
+});
+$<HTMLInputElement>("station-name-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    $<HTMLButtonElement>("rename-station").click();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    setStationEditing(false);
+  }
+});
 bind("station-open", () => scene.setStationSettings({ closed: false }));
 bind("station-closed", () => scene.setStationSettings({ closed: true }));
 const stepDwell = (by: number) => {
