@@ -287,12 +287,11 @@
             <button id="station-closed" class="station-light closed" title="İstasyonu kapat" aria-label="İstasyonu kapat"></button>
           </div>
         </div>
-        <p id="station-status" class="station-status" aria-live="polite"></p>
         <div id="station-dwell-row" class="station-row">
-          <span>Bekleme süresi</span>
-          <div class="stepper">
+          <p id="station-status" class="station-status" aria-live="polite"></p>
+          <div class="stepper" aria-label="Bekleme süresi">
             <button id="dwell-minus" aria-label="Bekleme süresini azalt">−</button
-            ><output id="dwell-value">3 sn</output
+            ><output id="dwell-value" class="station-dwell-value">3 sn</output
             ><button id="dwell-plus" aria-label="Bekleme süresini artır">+</button>
           </div>
         </div>
