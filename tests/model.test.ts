@@ -389,6 +389,14 @@ test("open stations hold trains at the middle of their rail", () => {
   // Back to defaults leaves nothing extra in the save.
   setStation(world, { x: 9, y: 8 }, { closed: false, dwell: 3 });
   assert.deepEqual(world.decorations[0], { x: 9, y: 8, kind: "stationSmall" });
+
+  // Custom names are trimmed, persisted, and can be reset to the default.
+  assert.ok(setStation(world, { x: 9, y: 8 }, { name: "  Merkez   İstasyonu  " }));
+  assert.equal(world.decorations[0].name, "Merkez İstasyonu");
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  assert.ok(setStation(world, { x: 9, y: 8 }, { name: "   " }));
+  assert.equal(world.decorations[0].name, undefined);
+
   assert.equal(setStation(world, { x: 10, y: 8 }, { dwell: 5 }), false);
 });
 
@@ -398,7 +406,10 @@ test("station settings are validated when loading", () => {
     { x: 9, y: 8, kind: "stationSmall", dwell: 0 },
     { x: 9, y: 8, kind: "stationSmall", dwell: 2.5 },
     { x: 9, y: 8, kind: "stationSmall", closed: "yes" },
+    { x: 9, y: 8, kind: "stationSmall", name: "" },
+    { x: 9, y: 8, kind: "stationSmall", name: "x".repeat(33) },
     { x: 9, y: 8, kind: "tunnelStone", dwell: 4 },
+    { x: 9, y: 8, kind: "tunnelStone", name: "Tünel" },
   ];
   for (const decoration of bad)
     assert.equal(parseWorld(JSON.stringify({ ...base, decorations: [decoration] })), null);
