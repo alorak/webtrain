@@ -2,7 +2,14 @@ import Phaser from "phaser";
 import "./style.css";
 import { WebTrainScene, type GameStatus } from "./scenes/WebTrainScene";
 import { decoration } from "./game/art";
-import { candidate, vectors, type DecorationKind, type Turn } from "./game/model";
+import {
+  candidate,
+  vectors,
+  type Chunk,
+  type ChunkEdge,
+  type DecorationKind,
+  type Turn,
+} from "./game/model";
 const paths: Record<string, string> = {
   train:
     '<rect x="4" y="8" width="14" height="10" rx="3"/><path d="M7 8V4h7v4M18 11h3v7H3M7 21h.01M16 21h.01M8 12h5"/>',
@@ -256,6 +263,54 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     button.style.top = `${clampedY}px`;
   };
 
+  const expandButtons = new Map<string, HTMLButtonElement>();
+  scene.onExpansionAnchors = (anchors) => {
+    const container = $("expand-controls");
+    const activeKeys = new Set(
+      anchors.map(({ chunk, edge }) => `${chunk.x},${chunk.y},${edge}`),
+    );
+
+    for (const [key, button] of expandButtons) {
+      if (!activeKeys.has(key)) {
+        button.remove();
+        expandButtons.delete(key);
+      }
+    }
+
+    const panelLeft =
+      document.querySelector(".library")?.getBoundingClientRect().left ??
+      window.innerWidth;
+
+    for (const anchor of anchors) {
+      const key = `${anchor.chunk.x},${anchor.chunk.y},${anchor.edge}`;
+      let button = expandButtons.get(key);
+      if (!button) {
+        button = document.createElement("button");
+        button.type = "button";
+        button.className = "expand-edge";
+        button.innerHTML = icon("forward");
+        button.setAttribute("aria-label", "Haritayı bu yönde genişlet");
+        button.onclick = () => {
+          pendingExpansion = {
+            chunk: { ...anchor.chunk },
+            edge: anchor.edge,
+          };
+          expand.showModal();
+        };
+        container.appendChild(button);
+        expandButtons.set(key, button);
+      }
+
+      button.hidden = !anchor.visible || anchor.x > panelLeft - 22;
+      button.style.left = `${anchor.x}px`;
+      button.style.top = `${anchor.y}px`;
+      button.style.setProperty(
+        "--expand-rotation",
+        `${anchor.rotation + 90}deg`,
+      );
+    }
+  };
+
   for (const item of items) {
     const g = scene.add.graphics();
     g.save().translateCanvas(48, 104);
@@ -337,7 +392,9 @@ document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
 );
 
 const help = $<HTMLDialogElement>("help-dialog"),
-  reset = $<HTMLDialogElement>("reset-dialog");
+  reset = $<HTMLDialogElement>("reset-dialog"),
+  expand = $<HTMLDialogElement>("expand-dialog");
+let pendingExpansion: { chunk: Chunk; edge: ChunkEdge } | null = null;
 $("help-button").onclick = () => help.showModal();
 help
   .querySelectorAll<HTMLButtonElement>("button")
@@ -349,11 +406,24 @@ $("confirm-reset").onclick = () => {
   reset.close();
   toast("Yeni bir dünya, yeni bir hikâye.");
 };
+$("cancel-expand").onclick = () => {
+  pendingExpansion = null;
+  expand.close();
+};
+$("confirm-expand").onclick = () => {
+  if (scene && pendingExpansion) {
+    scene.expandWorld(pendingExpansion.chunk, pendingExpansion.edge);
+    toast("Yeni 24 × 24 alan açıldı.");
+  }
+  pendingExpansion = null;
+  expand.close();
+};
 window.addEventListener("keydown", (e) => {
   if (
     !scene ||
     help.open ||
     reset.open ||
+    expand.open ||
     (e.target instanceof HTMLElement &&
       /INPUT|SELECT|TEXTAREA/.test(e.target.tagName))
   )
