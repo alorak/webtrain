@@ -4,6 +4,8 @@ import {
   appendTrack,
   candidate,
   createWorld,
+  expandChunk,
+  exposedChunkEdges,
   inside,
   nextCell,
   parseWorld,
@@ -19,12 +21,37 @@ import {
 } from "../src/game/model.ts";
 const fresh = (): World => ({
   version: 1,
+  chunks: [{ x: 0, y: 0 }],
   tracks: [{ x: 8, y: 8, entry: 0, exit: 0 }],
   decorations: [],
   closed: false,
 });
 const near = (a: number, b: number) =>
   assert.ok(Math.abs(a - b) < 1e-8, `${a} ≠ ${b}`);
+test("world expands in independent 24x24 chunks and only exposed edges remain", () => {
+  const world = fresh();
+  assert.equal(exposedChunkEdges(world).length, 4);
+  assert.equal(expandChunk(world, { x: 0, y: 0 }, "x+"), true);
+  assert.deepEqual(world.chunks, [
+    { x: 0, y: 0 },
+    { x: 1, y: 0 },
+  ]);
+  assert.equal(inside({ x: 24, y: 8 }, world), true);
+  assert.equal(inside({ x: 48, y: 8 }, world), false);
+  assert.equal(exposedChunkEdges(world).length, 6);
+  assert.equal(expandChunk(world, { x: 1, y: 0 }, "y-"), true);
+  assert.equal(inside({ x: 30, y: -1 }, world), true);
+  assert.equal(exposedChunkEdges(world).length, 8);
+});
+
+test("old saves without chunk metadata migrate into the original board", () => {
+  const legacy = fresh() as World & { chunks?: World["chunks"] };
+  delete legacy.chunks;
+  const parsed = parseWorld(JSON.stringify(legacy));
+  assert.ok(parsed);
+  assert.deepEqual(parsed.chunks, [{ x: 0, y: 0 }]);
+});
+
 test("all straight and curved pieces meet cell edges with continuous tangents", () => {
   for (let h = 0; h < 4; h++)
     for (const turn of [-1, 0, 1] as Turn[]) {
@@ -83,6 +110,19 @@ test("rails and decorations cannot overlap or leave the map", () => {
   assert.equal(candidate(world, 1), null);
   assert.equal(inside({ x: 1.5, y: 1 }), false);
 });
+test("tracks can continue across an expanded chunk boundary", () => {
+  const world = fresh();
+  world.tracks = [{ x: 23, y: 8, entry: 0, exit: 0 }];
+  assert.equal(candidate(world, 0), null);
+  assert.equal(expandChunk(world, { x: 0, y: 0 }, "x+"), true);
+  assert.deepEqual(candidate(world, 0), {
+    x: 24,
+    y: 8,
+    entry: 0,
+    exit: 0,
+  });
+});
+
 test("rail infrastructure can occupy a track but ordinary scenery cannot", () => {
   const world = fresh();
   assert.equal(placeDecoration(world, { x: 8, y: 8 }, "house"), false);
