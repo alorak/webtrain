@@ -78,51 +78,44 @@ export function roadTile(
   kind: "roadAsphalt" | "roadDirt",
   connected: boolean[],
 ) {
-  const endpoints = [
-    { x: 24, y: 12 },
-    { x: -24, y: 12 },
-    { x: -24, y: -12 },
-    { x: 24, y: -12 },
-  ];
-
-  let headings = connected
-    .map((value, index) => (value ? index : -1))
-    .filter((index) => index >= 0);
-
-  // A single placed road still reads as a useful path. Once a neighbour is
-  // added, both cells automatically align to the shared grid direction.
-  if (headings.length === 0) headings = [0, 2];
-  else if (headings.length === 1)
-    headings = [headings[0], (headings[0] + 2) % 4];
-
+  // Roads behave like water tiles: placement is not directional. Each click
+  // paints one isometric cell and neighbouring cells of the same road kind
+  // visually merge by removing the shared boundary.
+  const top = { x: 0, y: -24 };
+  const right = { x: 48, y: 0 };
+  const bottom = { x: 0, y: 24 };
+  const left = { x: -48, y: 0 };
   const asphalt = kind === "roadAsphalt";
-  const outer = asphalt ? 0x7f857f : 0xa98155;
-  const inner = asphalt ? 0x555c58 : 0xc69a67;
 
-  for (const heading of headings) {
-    const end = endpoints[heading];
-    g.lineStyle(asphalt ? 18 : 19, outer, 0.96);
-    g.lineBetween(0, 0, end.x, end.y);
-  }
-  ellipse(g, outer, 0, 0, asphalt ? 19 : 20, asphalt ? 13 : 14, 0.96);
+  const surface = asphalt ? 0x7f8d8a : 0xb17a43;
+  const edge = asphalt ? 0x66736f : 0x986437;
+  const highlight = asphalt ? 0xa6b2ae : 0xcf9b62;
 
-  for (const heading of headings) {
-    const end = endpoints[heading];
-    g.lineStyle(asphalt ? 13 : 14, inner, 1);
-    g.lineBetween(0, 0, end.x, end.y);
-  }
-  ellipse(g, inner, 0, 0, asphalt ? 14 : 15, asphalt ? 9 : 10);
+  poly(g, surface, [0, -24, 48, 0, 0, 24, -48, 0]);
 
+  const edges = [
+    [right, bottom],
+    [bottom, left],
+    [left, top],
+    [top, right],
+  ] as const;
+
+  g.lineStyle(2, edge, 0.82);
+  edges.forEach(([a, b], heading) => {
+    if (!connected[heading]) g.lineBetween(a.x, a.y, b.x, b.y);
+  });
+
+  // Light, non-directional material texture. No lane stripe is drawn, so an
+  // isolated tile never implies a road direction.
   if (asphalt) {
-    g.lineStyle(1.4, 0xe8e3c5, 0.8);
-    for (const heading of headings) {
-      const end = endpoints[heading];
-      g.lineBetween(end.x * 0.28, end.y * 0.28, end.x * 0.48, end.y * 0.48);
-      g.lineBetween(end.x * 0.68, end.y * 0.68, end.x * 0.84, end.y * 0.84);
-    }
+    ellipse(g, highlight, -18, -5, 5, 3, 0.28);
+    ellipse(g, 0x5f6b68, 13, 6, 4, 2, 0.22);
+    ellipse(g, highlight, 23, -2, 3, 2, 0.2);
   } else {
-    ellipse(g, 0xb78355, -5, -1, 3, 2, 0.7);
-    ellipse(g, 0xdfb985, 7, 2, 4, 2, 0.65);
+    ellipse(g, edge, -19, -5, 5, 3, 0.42);
+    ellipse(g, highlight, -2, 7, 6, 3, 0.45);
+    ellipse(g, edge, 18, 2, 4, 2, 0.32);
+    ellipse(g, highlight, 24, -6, 3, 2, 0.38);
   }
 }
 
