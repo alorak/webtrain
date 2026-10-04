@@ -16,6 +16,7 @@ import {
   type GrassKind,
   type RoadKind,
   type Track,
+  type TrainColor,
 } from "./model";
 type G = Phaser.GameObjects.Graphics;
 export const project = (p: Point) => ({
@@ -1987,16 +1988,49 @@ function tunnel(g: G, frame: Frame, green: boolean) {
   }
 }
 
+// Paint schemes for the train. Each colour comes with a roof, chassis, side
+// stripe and window glass picked to go with it.
+export interface TrainTheme {
+  label: string;
+  body: number;
+  roof: number;
+  chassis: number;
+  stripe: number;
+  glass: number;
+}
+export const trainThemes: Record<TrainColor, TrainTheme> = {
+  green: { label: "Yeşil", body: 0x377c79, roof: 0x28493f, chassis: 0xba7855, stripe: 0xf2d27a, glass: 0xf7df9e },
+  red: { label: "Kırmızı", body: 0xb8433a, roof: 0x3b3a45, chassis: 0x5c5f69, stripe: 0xf2d27a, glass: 0xf7df9e },
+  blue: { label: "Mavi", body: 0x2f69a6, roof: 0x23344c, chassis: 0x8b8f98, stripe: 0xf4efe0, glass: 0xf7df9e },
+  yellow: { label: "Sarı", body: 0xe3b23c, roof: 0x3a3c42, chassis: 0x45484f, stripe: 0x2e3035, glass: 0xcfe4ec },
+  orange: { label: "Turuncu", body: 0xd9732f, roof: 0x4b3a33, chassis: 0x5b4b42, stripe: 0xf6e7c6, glass: 0xf7df9e },
+  purple: { label: "Mor", body: 0x76519f, roof: 0x3a2c51, chassis: 0x5c5568, stripe: 0xf2d27a, glass: 0xf7df9e },
+  black: { label: "Siyah", body: 0x34383f, roof: 0x1f2126, chassis: 0xa8433b, stripe: 0xd8b35a, glass: 0xf7df9e },
+  white: { label: "Beyaz", body: 0xe7e3d7, roof: 0x2f69a6, chassis: 0x5b6371, stripe: 0x2f69a6, glass: 0x4d6e8c },
+};
+export const cssColor = (color: number) => `#${color.toString(16).padStart(6, "0")}`;
+function mixWhite(color: number, f: number) {
+  const c = (shift: number) => {
+    const v = (color >> shift) & 255;
+    return Math.round(v + (255 - v) * f);
+  };
+  return (c(16) << 16) | (c(8) << 8) | c(0);
+}
+// Top, side and end shades of a box painted in one colour.
+const shades = (color: number, up = 0.22) => [mixWhite(color, up), color, tint(color, 0.8)];
+
 // A little 3D locomotive: its boxes are projected in the direction of travel.
 // car: the engine, or a wagon for passengers or freight; index varies the
-// freight wagons along the train.
+// freight wagons along the train; color picks the paint scheme.
 export function locomotive(
   g: G,
   point: Point,
   tangent: Point,
   car: "engine" | Cargo = "engine",
   index = 0,
+  color: TrainColor = "green",
 ) {
+  const theme = trainThemes[color];
   const scale = 0.76;
   const p = (forward: number, side: number, height: number) => {
     const pos = project({
@@ -2085,22 +2119,29 @@ export function locomotive(
       ellipse(g, 0x344d47, wheel.x, wheel.y, 7, 8);
       ellipse(g, 0xccc5a1, wheel.x, wheel.y, 3, 3);
     }
-  box(-0.36, 0.36, 0.17, 5, 10, [0xdeae69, 0xba7855, 0x986047]);
+  box(-0.36, 0.36, 0.17, 5, 10, shades(theme.chassis, 0.3));
   // Only the side of a wagon that faces the viewer gets windows or a door.
-  const near = p(0, 0.16, 0).y > p(0, -0.16, 0).y ? 0.161 : -0.161;
+  const near = p(0, 0.16, 0).y > p(0, -0.16, 0).y ? 1 : -1;
+  // A band of the accent colour along the side facing the viewer.
+  const stripe = (a: number, b: number, w: number, bottom: number, top: number) =>
+    face(theme.stripe, [[a, near * w, bottom], [b, near * w, bottom], [b, near * w, top], [a, near * w, top]]);
+  const body = shades(theme.body);
+  const roof = shades(theme.roof, 0.1);
   if (car === "passengers") {
-    box(-0.34, 0.34, 0.16, 10, 27, [0xf2e6c8, 0x4f8f86, 0x3f7a72]);
+    box(-0.34, 0.34, 0.16, 10, 27, body);
+    stripe(-0.34, 0.34, 0.161, 12, 14);
     for (const a of [-0.27, -0.12, 0.03, 0.18])
-      face(0xf7df9e, [[a, near, 16], [a + 0.09, near, 16], [a + 0.09, near, 23], [a, near, 23]]);
-    box(-0.36, 0.36, 0.175, 27, 30, [0x36594f, 0x28493f, 0x203e37]);
+      face(theme.glass, [[a, near * 0.161, 16], [a + 0.09, near * 0.161, 16], [a + 0.09, near * 0.161, 23], [a, near * 0.161, 23]]);
+    box(-0.36, 0.36, 0.175, 27, 30, roof);
     return;
   }
   if (car === "freight") {
     if (index % 2 === 0) {
-      // Covered van with a sliding door.
-      box(-0.33, 0.33, 0.16, 10, 26, [0xc96a5c, 0x9b453b, 0x84392f]);
-      face(0x84392f, [[-0.09, near, 11], [0.09, near, 11], [0.09, near, 24], [-0.09, near, 24]]);
-      face(0xd9b27e, [[-0.01, near, 11], [0.01, near, 11], [0.01, near, 24], [-0.01, near, 24]]);
+      // Covered van with a sliding door, in the train's colour.
+      box(-0.33, 0.33, 0.16, 10, 26, body);
+      face(body[2], [[-0.09, near * 0.161, 11], [0.09, near * 0.161, 11], [0.09, near * 0.161, 24], [-0.09, near * 0.161, 24]]);
+      face(theme.stripe, [[-0.01, near * 0.161, 11], [0.01, near * 0.161, 11], [0.01, near * 0.161, 24], [-0.01, near * 0.161, 24]]);
+      box(-0.35, 0.35, 0.17, 26, 28, roof);
     } else {
       // Open wagon carrying crates.
       box(-0.33, 0.33, 0.16, 10, 17, [0x8a6142, 0x7a5638, 0x684a30]);
@@ -2109,12 +2150,14 @@ export function locomotive(
     }
     return;
   }
-  box(-0.29, -0.02, 0.16, 10, 34, [0x659f97, 0x377c79, 0x286660]);
-  box(-0.33, 0.01, 0.21, 34, 38, [0x36594f, 0x28493f, 0x203e37]);
-  box(0.0, 0.3, 0.13, 10, 23, [0x74b3a6, 0x4b958a, 0x3b7d73]);
-  box(0.17, 0.26, 0.08, 23, 34, [0x3e6155, 0x2f5047, 0x233e37]);
+  box(-0.29, -0.02, 0.16, 10, 34, body);
+  stripe(-0.29, -0.02, 0.161, 13, 16);
+  box(-0.33, 0.01, 0.21, 34, 38, roof);
+  box(0.0, 0.3, 0.13, 10, 23, shades(mixWhite(theme.body, 0.12)));
+  stripe(0.0, 0.3, 0.131, 13, 16);
+  box(0.17, 0.26, 0.08, 23, 34, shades(mixWhite(theme.roof, 0.08), 0.1));
   for (const s of [-0.165, 0.165])
-    face(0xf7df9e, [
+    face(theme.glass, [
       [-0.25, s, 23],
       [-0.08, s, 23],
       [-0.08, s, 31],
