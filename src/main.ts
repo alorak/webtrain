@@ -3,10 +3,10 @@ import "./style.css";
 import { WebTrainScene, type GameStatus } from "./scenes/WebTrainScene";
 import { decoration } from "./game/art";
 import {
-  candidate,
   vectors,
   type Chunk,
   type ChunkEdge,
+  type BranchKind,
   type DecorationKind,
   type Turn,
 } from "./game/model";
@@ -26,6 +26,7 @@ const paths: Record<string, string> = {
   left: '<path d="M17 20v-7a6 6 0 0 0-6-6H4m5-5L4 7l5 5"/>',
   right: '<path d="M7 20v-7a6 6 0 0 1 6-6h7m-5-5 5 5-5 5"/>',
   forward: '<path d="M12 21V3m-6 6 6-6 6 6"/>',
+  switch: '<path d="M8 21V3M8 14c0-4 3-6 8-6h3m-3-3 3 3-3 3"/>',
   trash: '<path d="M4 6h16M9 6V3h6v3M6 6l1 15h10l1-15M10 10v7M14 10v7"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   minus: '<path d="M5 12h14"/>',
@@ -51,13 +52,21 @@ const items: {
   category: "nature" | "buildings" | "park" | "train";
   color: string;
 }[] = [
+  { kind: "water", name: "Su", category: "nature", color: "blue" },
+  { kind: "grassLight", name: "Açık çimen", category: "nature", color: "sage" },
+  { kind: "grassDark", name: "Koyu çimen", category: "nature", color: "sage" },
   { kind: "tree", name: "Ağaç", category: "nature", color: "sage" },
   { kind: "pine", name: "Çam", category: "nature", color: "sage" },
   { kind: "treeSmall", name: "Küçük ağaç", category: "nature", color: "sage" },
   { kind: "blossom", name: "Çiçekli ağaç", category: "nature", color: "peach" },
+  { kind: "grove", name: "Koru", category: "nature", color: "sage" },
+  { kind: "pineForest", name: "Çam ormanı", category: "nature", color: "sage" },
+  { kind: "autumnTrees", name: "Sonbahar ağaçları", category: "nature", color: "sun" },
+  { kind: "orchard", name: "Meyve bahçesi", category: "nature", color: "peach" },
+  { kind: "bushes", name: "Çalılar", category: "nature", color: "sage" },
   { kind: "flowers", name: "Çiçekler", category: "nature", color: "peach" },
+  { kind: "rocks", name: "Kayalar", category: "nature", color: "stone" },
   { kind: "pond", name: "Gölet", category: "nature", color: "blue" },
-  { kind: "water", name: "Su", category: "nature", color: "blue" },
   { kind: "waterfall", name: "Şelale", category: "nature", color: "blue" },
   { kind: "fountain", name: "Fıskiye", category: "nature", color: "blue" },
   { kind: "mountain", name: "Dağ", category: "nature", color: "stone" },
@@ -66,18 +75,36 @@ const items: {
   { kind: "cow", name: "İnek", category: "nature", color: "sand" },
   { kind: "sheep", name: "Koyun", category: "nature", color: "sand" },
   { kind: "chicken", name: "Tavuklar", category: "nature", color: "sun" },
+  { kind: "horses", name: "Atlar", category: "nature", color: "sand" },
+  { kind: "goats", name: "Keçiler", category: "nature", color: "stone" },
+  { kind: "deer", name: "Geyikler", category: "nature", color: "sage" },
 
+  { kind: "roadAsphalt", name: "Asfalt yol", category: "buildings", color: "stone" },
+  { kind: "roadDirt", name: "Toprak yol", category: "buildings", color: "sand" },
+  { kind: "roadStone", name: "Taş yol", category: "buildings", color: "stone" },
   { kind: "house", name: "Ev", category: "buildings", color: "peach" },
   { kind: "houseBlue", name: "Mavi çatılı ev", category: "buildings", color: "blue" },
   { kind: "houseRed", name: "Kırmızı çatılı ev", category: "buildings", color: "peach" },
   { kind: "cottage", name: "Küçük ev", category: "buildings", color: "sand" },
+  { kind: "apartment", name: "Apartman", category: "buildings", color: "stone" },
   { kind: "farmhouse", name: "Çiftlik evi", category: "buildings", color: "sand" },
-  { kind: "roadAsphalt", name: "Asfalt yol", category: "buildings", color: "stone" },
-  { kind: "roadDirt", name: "Toprak yol", category: "buildings", color: "sand" },
-  { kind: "tent", name: "Çadır", category: "buildings", color: "blue" },
+  { kind: "smallFarm", name: "Küçük çiftlik", category: "buildings", color: "sage" },
+  { kind: "market", name: "Market", category: "buildings", color: "sage" },
+  { kind: "bakery", name: "Fırın", category: "buildings", color: "sun" },
+  { kind: "cafe", name: "Kafe", category: "buildings", color: "peach" },
+  { kind: "postOffice", name: "Postane", category: "buildings", color: "sun" },
+  { kind: "library", name: "Kütüphane", category: "buildings", color: "peach" },
+  { kind: "fireStation", name: "İtfaiye", category: "buildings", color: "peach" },
+  { kind: "policeStation", name: "Polis merkezi", category: "buildings", color: "blue" },
+  { kind: "hospital", name: "Hastane (haç)", category: "buildings", color: "stone" },
+  { kind: "hospitalCrescent", name: "Hastane (hilal)", category: "buildings", color: "stone" },
+  { kind: "school", name: "Okul", category: "buildings", color: "sun" },
+  { kind: "mosque", name: "Cami", category: "buildings", color: "blue" },
+  { kind: "cityHall", name: "Belediye binası", category: "buildings", color: "sand" },
+  { kind: "tent", name: "Kamp", category: "buildings", color: "blue" },
   { kind: "windmill", name: "Yel değirmeni", category: "buildings", color: "sand" },
-  { kind: "carousel", name: "Atlı karınca", category: "buildings", color: "sun" },
 
+  { kind: "carousel", name: "Atlı karınca", category: "park", color: "sun" },
   { kind: "balloon", name: "Balon", category: "park", color: "sun" },
   { kind: "ferris", name: "Dönme dolap", category: "park", color: "peach" },
   { kind: "cake", name: "Pasta", category: "park", color: "peach" },
@@ -97,7 +124,12 @@ const items: {
 $("decoration-grid").innerHTML = items
   .map((item) => {
     const hidden = item.category === "nature" ? "" : " hidden";
-    return `<button class="decor-card ${item.color}" data-kind="${item.kind}" data-group="${item.category}" aria-label="${item.name} ekle" aria-pressed="false"${hidden}><img alt="" draggable="false"/></button>`;
+    const card = `<button class="decor-card ${item.color}" data-kind="${item.kind}" data-group="${item.category}" aria-label="${item.name} ekle" aria-pressed="false"${hidden}><img alt="" draggable="false"/></button>`;
+    // Ground tiles (water and grass, or the roads) lead their panel on their
+    // own row, ruled off from the rest.
+    return item.kind === "grassDark" || item.kind === "roadStone"
+      ? `${card}<hr class="decor-divider" data-group="${item.category}"${hidden}/>`
+      : card;
   })
   .join("");
 
@@ -170,9 +202,9 @@ function refresh(status: GameStatus) {
   $("track-count").textContent = String(status.world.tracks.length);
   $("decor-count").textContent = String(status.world.decorations.length);
   $("zoom-label").textContent = `${Math.round(status.zoom * 100)}%`;
-  $("play-label").textContent = status.playing
-    ? "Duraklat"
-    : "Treni çalıştır";
+  const playLabel = status.playing ? "Treni durdur" : "Treni çalıştır";
+  $("play").setAttribute("aria-label", playLabel);
+  $("play").title = playLabel;
   $("play").firstElementChild!.innerHTML = icon(
     status.playing ? "pause" : "play",
   );
@@ -183,71 +215,126 @@ function refresh(status: GameStatus) {
 
 }
 
+// Cards are drawn large and then cropped to what was painted, so every
+// object fills its card whatever its size in the world.
+const CARD_SCALE = 3;
+function fitCard(source: HTMLCanvasElement) {
+  const { width, height } = source;
+  const pixels = source.getContext("2d")!.getImageData(0, 0, width, height).data;
+  let [left, top, right, bottom] = [width, height, -1, -1];
+  for (let y = 0; y < height; y++)
+    for (let x = 0; x < width; x++)
+      if (pixels[(y * width + x) * 4 + 3] > 24) {
+        left = Math.min(left, x);
+        right = Math.max(right, x);
+        top = Math.min(top, y);
+        bottom = Math.max(bottom, y);
+      }
+  if (right < 0) return source;
+  const w = right - left + 1;
+  const h = bottom - top + 1;
+  const side = Math.ceil(Math.max(w, h) * 1.08);
+  const card = document.createElement("canvas");
+  card.width = card.height = side;
+  card
+    .getContext("2d")!
+    .drawImage(source, left, top, w, h, (side - w) / 2, (side - h) / 2, w, h);
+  return card;
+}
+
+// A world heading as a unit vector on screen.
+const screenVector = (heading: number) => {
+  const world = vectors[((heading % 4) + 4) % 4];
+  const sx = (world.x - world.y) * 48;
+  const sy = (world.x + world.y) * 24;
+  const length = Math.hypot(sx, sy) || 1;
+  return { x: sx / length, y: sy / length };
+};
+
 game.events.once("world-ready", (ready: WebTrainScene) => {
   scene = ready;
   scene.onChange = refresh;
   scene.onMessage = toast;
-  let previousAnchor = "";
-  scene.onAnchor = (x, y, visible, _blocked) => {
-    const lastTrack = scene.world.tracks.at(-1)!;
-    const heading = lastTrack.exit;
+  let previousRail = "";
+  scene.onRailControls = (controls) => {
+    const key = JSON.stringify([controls, window.innerWidth, window.innerHeight], (_k, v) =>
+      typeof v === "number" ? Math.round(v) : v,
+    );
+    if (key === previousRail) return;
+    previousRail = key;
     const panel = document.querySelector(".library")!.getBoundingClientRect();
     const right = panel.left - (window.innerWidth < 760 ? 8 : 12);
     const radius = window.innerWidth < 760 ? 62 : 76;
     const safe = radius + 14;
-    const anchor = `${Math.round(x)},${Math.round(y)},${visible},${heading},${Math.round(right)},${window.innerWidth},${window.innerHeight}`;
-    if (anchor === previousAnchor) return;
-    previousAnchor = anchor;
-
-    const el = $("track-actions");
-    const shown =
-      visible &&
-      x > 18 &&
-      x < right - 18 &&
-      y > 18 &&
-      y < window.innerHeight - 18;
-    el.hidden = !shown;
-    if (!shown) return;
-
-    const centerX = Phaser.Math.Clamp(x, safe, Math.max(safe, right - safe));
-    const centerY = Phaser.Math.Clamp(
-      y,
-      safe,
-      Math.max(safe, window.innerHeight - safe),
-    );
-    el.style.left = `${centerX}px`;
-    el.style.top = `${centerY}px`;
-
-    const screenVector = (targetHeading: number) => {
-      const world = vectors[targetHeading];
-      const sx = (world.x - world.y) * 48;
-      const sy = (world.x + world.y) * 24;
-      const length = Math.hypot(sx, sy) || 1;
-      return { x: sx / length, y: sy / length };
+    const onMap = (x: number, y: number) =>
+      x > 18 && x < right - 18 && y > 18 && y < window.innerHeight - 18;
+    const place = (el: HTMLElement, x: number, y: number) => {
+      el.style.left = `${Phaser.Math.Clamp(x, safe, Math.max(safe, right - safe))}px`;
+      el.style.top = `${Phaser.Math.Clamp(y, safe, Math.max(safe, window.innerHeight - safe))}px`;
     };
+    const angle = (v: { x: number; y: number }) => (Math.atan2(v.y, v.x) * 180) / Math.PI;
 
-    const forward = screenVector(heading);
+    // Extending from a loose end: left, forward and right around the end.
+    const actions = $("track-actions");
+    const end = controls.end;
+    actions.hidden = !end || !onMap(end.x, end.y);
+    if (end && !actions.hidden) {
+      place(actions, end.x, end.y);
+      const forward = screenVector(end.heading);
+      actions.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
+        const turn = Number(button.dataset.turn) as Turn;
+        const direction = screenVector(end.heading + turn);
+        // Each SVG has a different native arrow-head direction.
+        const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
+        button.style.setProperty("--turn-x", `${direction.x * radius}px`);
+        button.style.setProperty("--turn-y", `${direction.y * radius}px`);
+        button.style.setProperty("--turn-rotation", `${angle(direction) - nativeAngle}deg`);
+        button.disabled = !end.can[turn + 1];
+      });
+      // Delete sits behind the endpoint, away from all three possible new tracks.
+      const remove = $<HTMLButtonElement>("remove-track");
+      remove.hidden = !end.remove;
+      remove.style.setProperty("--delete-x", `${-forward.x * radius * 0.82}px`);
+      remove.style.setProperty("--delete-y", `${-forward.y * radius * 0.82}px`);
+    }
 
-    el.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
-      const turn = Number(button.dataset.turn) as Turn;
-      const targetHeading = (heading + turn + 4) % 4;
-      const direction = screenVector(targetHeading);
-      const targetAngle =
-        (Math.atan2(direction.y, direction.x) * 180) / Math.PI;
-      // Each SVG has a different native arrow-head direction.
-      const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
-      const rotation = targetAngle - nativeAngle;
+    // Branching a straight rail: four diagonal arrows around the piece.
+    const branchActions = $("branch-actions");
+    const branch = controls.branch;
+    branchActions.hidden = !branch || !onMap(branch.x, branch.y);
+    if (branch && !branchActions.hidden) {
+      place(branchActions, branch.x, branch.y);
+      branchActions.querySelectorAll<HTMLButtonElement>("[data-branch]").forEach((button) => {
+        const kind = button.dataset.branch as BranchKind;
+        // Same geometry as the model: travel one way, then turn off to a side.
+        const travel = branch.heading + (kind.startsWith("back") ? 2 : 0);
+        const along = screenVector(travel);
+        const side = screenVector(travel + (kind.endsWith("Right") ? 1 : 3));
+        const raw = { x: along.x + side.x, y: along.y + side.y };
+        const length = Math.hypot(raw.x, raw.y) || 1;
+        const direction = { x: raw.x / length, y: raw.y / length };
+        button.style.setProperty("--turn-x", `${direction.x * radius * 0.9}px`);
+        button.style.setProperty("--turn-y", `${direction.y * radius * 0.9}px`);
+        button.style.setProperty("--turn-rotation", `${angle(direction) + 90}deg`);
+        // Blocked directions stay clickable so the game can say why.
+        button.classList.toggle("blocked", !branch.can[kind]);
+        button.setAttribute("aria-disabled", String(!branch.can[kind]));
+      });
+    }
 
-      button.style.setProperty("--turn-x", `${direction.x * radius}px`);
-      button.style.setProperty("--turn-y", `${direction.y * radius}px`);
-      button.style.setProperty("--turn-rotation", `${rotation}deg`);
-      button.disabled = !candidate(scene.world, turn);
-    });
-
-    // Delete sits behind the endpoint, away from all three possible new tracks.
-    const remove = $<HTMLButtonElement>("remove-track");
-    remove.style.setProperty("--delete-x", `${-forward.x * radius * 0.82}px`);
-    remove.style.setProperty("--delete-y", `${-forward.y * radius * 0.82}px`);
+    // A switch shows a button that flips which way trains go.
+    const toggle = $<HTMLButtonElement>("switch-toggle");
+    const sw = controls.toggle;
+    toggle.hidden = !sw || !onMap(sw.x, sw.y);
+    if (sw && !toggle.hidden) {
+      toggle.style.left = `${sw.x}px`;
+      toggle.style.top = `${sw.y}px`;
+      toggle.classList.toggle("thrown", sw.thrown);
+      toggle.setAttribute(
+        "aria-label",
+        sw.thrown ? "Makası düz yola çevir" : "Makası yan yola çevir",
+      );
+    }
   };
   let previousDecorationAnchor = "";
   scene.onDecorationAnchor = (x, y, visible) => {
@@ -316,17 +403,17 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
 
   for (const item of items) {
     const g = scene.add.graphics();
-    g.save().translateCanvas(48, 104);
+    g.save().scaleCanvas(CARD_SCALE, CARD_SCALE).translateCanvas(70, 125);
     decoration(g, item.kind);
     g.restore();
-    g.generateTexture(`card-${item.kind}`, 96, 120);
+    const key = `card-${item.kind}`;
+    g.generateTexture(key, 140 * CARD_SCALE, 160 * CARD_SCALE);
     g.destroy();
-    const canvas = scene.textures
-      .get(`card-${item.kind}`)
-      .getSourceImage() as HTMLCanvasElement;
+    const canvas = scene.textures.get(key).getSourceImage() as HTMLCanvasElement;
     document.querySelector<HTMLImageElement>(
       `[data-kind="${item.kind}"] img`,
-    )!.src = canvas.toDataURL();
+    )!.src = fitCard(canvas).toDataURL();
+    scene.textures.remove(key);
   }
   scene.emit();
 });
@@ -393,6 +480,18 @@ document
     button.onblur = () => scene?.previewTurn(null);
   });
 
+document
+  .querySelectorAll<HTMLButtonElement>("[data-branch]")
+  .forEach((button) => {
+    const kind = button.dataset.branch as BranchKind;
+    button.onclick = () => scene?.branch(kind);
+    button.onpointerenter = () => scene?.previewBranch(kind);
+    button.onpointerleave = () => scene?.previewBranch(null);
+    button.onfocus = () => scene?.previewBranch(kind);
+    button.onblur = () => scene?.previewBranch(null);
+  });
+bind("switch-toggle", () => scene.toggleSelectedSwitch());
+
 document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
   (button) =>
     (button.onclick = () => {
@@ -445,7 +544,7 @@ const cancelDeletion = () => {
 };
 $("cancel-delete").onclick = cancelDeletion;
 $("confirm-delete").onclick = () => {
-  if (scene && pendingDelete === "track") scene.removeLast();
+  if (scene && pendingDelete === "track") scene.removeSelectedTrack();
   else if (scene && pendingDelete === "decoration")
     scene.deleteSelectedDecoration();
 

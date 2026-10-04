@@ -1,27 +1,48 @@
 import Phaser from "phaser";
 import {
-  appendTrack,
-  candidate,
+  activePiece,
+  addBranch,
+  advanceTrain,
+  branchCandidate,
+  branchKinds,
   CHUNK_SIZE,
   connectedDecorationEdges,
   createWorld,
   expandChunk,
   exposedChunkEdges,
+  extendCandidate,
+  extendFrom,
   inside,
+  isGrassKind,
+  isGroundLayer,
+  isSwitch,
+  isRoadKind,
+  isTileKind,
   isTrackOverlayKind,
+  linked,
   neighboringChunk,
-  nextCell,
+  openEnds,
   parseWorld,
+  piecesAt,
   placeDecoration,
+  removableTrack,
+  removeTrack,
   same,
-  sampleRoute,
   sampleTrack,
   STORAGE_KEY,
-  trackLength,
+  switchThrown,
+  toggleSwitch,
+  trainPose,
+  type BranchKind,
   type Chunk,
   type ChunkEdge,
+  type DecorationKind,
+  type Heading,
   type Point,
+  type RailEnd,
   type Tool,
+  type Track,
+  type TrainState,
   type Turn,
   type World,
 } from "../game/model";
@@ -34,7 +55,9 @@ import {
   project,
   roadTile,
   trackDecoration,
+  trackDecorationLayers,
   unproject,
+  grassTile,
   waterTile,
 } from "../game/art";
 
@@ -45,6 +68,13 @@ export interface ExpansionAnchor {
   y: number;
   rotation: number;
   visible: boolean;
+}
+
+// Screen positions of the controls around the selected rail.
+export interface RailControls {
+  end: { x: number; y: number; heading: Heading; can: boolean[]; remove: boolean } | null;
+  branch: { x: number; y: number; heading: Heading; can: Record<BranchKind, boolean> } | null;
+  toggle: { x: number; y: number; thrown: boolean } | null;
 }
 
 export interface GameStatus {
@@ -60,8 +90,8 @@ export class WebTrainScene extends Phaser.Scene {
   world: World = createWorld();
   tool: Tool = "track";
   playing = false;
-  selected = true;
   saved = true;
+  private selectedRail: Point | null = null;
   private history: string[] = [];
   private future: string[] = [];
   private scenery: Phaser.GameObjects.Graphics[] = [];
@@ -81,12 +111,14 @@ export class WebTrainScene extends Phaser.Scene {
     moved: boolean;
   } | null = null;
   private pinch = 0;
-  private distance = 0.8;
-  private travelDirection = 1;
+  private trainState: TrainState = { track: 0, forward: true, t: 0.8 };
+  private trainTrack: Track | null = null;
+  // Pieces the train just left, so its wagon follows it through switches.
+  private trail: Track[] = [];
   private speed = 1;
   onChange?: (status: GameStatus) => void;
   onMessage?: (message: string) => void;
-  onAnchor?: (x: number, y: number, visible: boolean, blocked: boolean) => void;
+  onRailControls?: (controls: RailControls) => void;
   onDecorationAnchor?: (x: number, y: number, visible: boolean) => void;
   onExpansionAnchors?: (anchors: ExpansionAnchor[]) => void;
 
@@ -107,6 +139,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.preview = this.add.graphics().setDepth(2000);
     this.train = this.add.graphics();
     this.carriage = this.add.graphics();
+    this.selectedRail = this.world.tracks.at(-1)!;
     this.drawWorld();
     this.home();
     this.configureInput();
@@ -143,14 +176,14 @@ export class WebTrainScene extends Phaser.Scene {
     } catch {
       this.saved = false;
     }
-    this.distance = Math.min(this.distance, this.routeLength() - 0.05);
+    this.syncTrain();
     this.preview.clear();
     this.drawWorld();
     this.emit();
   }
   setTool(tool: Tool) {
     this.tool = tool;
-    this.selected = tool === "track";
+    this.selectedRail = tool === "track" ? this.world.tracks.at(-1)! : null;
     this.selectedDecorationIndex = null;
     this.preview.clear();
     this.emit();
@@ -162,32 +195,70 @@ export class WebTrainScene extends Phaser.Scene {
   setSpeed(speed: number) {
     this.speed = speed;
   }
+  // The loose end the rail controls extend: a switch's own branch first.
+  private railEnd(): RailEnd | null {
+    const cell = this.selectedRail;
+    if (!cell) return null;
+    const ends = openEnds(this.world).filter((e) => same(e.track, cell));
+    return (
+      ends.find((e) => e.track.entry !== e.track.exit && isSwitch(this.world, cell)) ??
+      ends.find((e) => e.side === e.track.exit) ??
+      ends[0] ??
+      null
+    );
+  }
   extend(turn: Turn) {
-    if (!candidate(this.world, turn)) {
-      this.onMessage?.("Burada yer yok. Son rayı silip başka bir yöne dön.");
+    const end = this.railEnd();
+    if (!end || !extendCandidate(this.world, end, turn)) {
+      this.onMessage?.("Burada yer yok. Başka bir yön seç.");
       return;
     }
     this.remember();
-    appendTrack(this.world, turn);
-    this.selected = true;
+    const track = extendFrom(this.world, end, turn)!;
+    this.selectedRail = { x: track.x, y: track.y };
     this.commit();
-    if (this.world.closed)
-      this.onMessage?.("Harika! Kapalı bir rota yaptın. Treni çalıştır.");
+    if (linked(this.world, track, track.exit).length)
+      this.onMessage?.("Raylar birleşti! Treni çalıştır.");
   }
-  removeLast() {
-    if (this.world.tracks.length <= 1) {
+  branch(kind: BranchKind) {
+    const cell = this.selectedRail;
+    if (!cell || !branchCandidate(this.world, cell, kind)) {
+      this.onMessage?.("Bu yönde yer yok. Yandaki kare boş olmalı.");
+      return;
+    }
+    this.remember();
+    addBranch(this.world, cell, kind);
+    this.commit();
+    this.onMessage?.("Makas eklendi. Yeni kolu uzatabilir, makası değiştirebilirsin.");
+  }
+  toggleSelectedSwitch() {
+    const cell = this.selectedRail;
+    if (!cell || !isSwitch(this.world, cell)) return;
+    this.remember();
+    toggleSwitch(this.world, cell);
+    this.commit();
+  }
+  removeSelectedTrack() {
+    const cell = this.selectedRail;
+    const track = cell && removableTrack(this.world, cell);
+    if (!cell || !track) {
       this.onMessage?.(
-        "Başlangıç rayı burada kalsın. Buradan yeni bir yol yapabilirsin.",
+        this.world.tracks.length <= 1
+          ? "Başlangıç rayı burada kalsın. Buradan yeni bir yol yapabilirsin."
+          : "Yalnızca açık uçtaki raylar silinebilir.",
       );
       return;
     }
     this.remember();
-    const removed = this.world.tracks.pop()!;
-    this.world.decorations = this.world.decorations.filter(
-      (d) => !(same(d, removed) && isTrackOverlayKind(d.kind)),
-    );
-    this.world.closed = false;
-    this.selected = true;
+    // Keep editing from the rail the removed piece was attached to.
+    const neighbour = [((track.entry + 2) % 4), track.exit]
+      .flatMap((side) => linked(this.world, track, side))[0];
+    removeTrack(this.world, cell);
+    this.selectedRail = piecesAt(this.world, cell).length
+      ? cell
+      : neighbour
+        ? { x: neighbour.x, y: neighbour.y }
+        : null;
     this.commit();
   }
   deleteSelectedDecoration() {
@@ -240,10 +311,10 @@ export class WebTrainScene extends Phaser.Scene {
       closed: false,
     };
     this.playing = false;
-    this.distance = 0.5;
-    this.travelDirection = 1;
+    this.trainState = { track: 0, forward: true, t: 0.5 };
+    this.trainTrack = null;
     this.tool = "track";
-    this.selected = true;
+    this.selectedRail = this.world.tracks[0];
     this.selectedDecorationIndex = null;
     this.commit();
     this.home();
@@ -305,28 +376,43 @@ export class WebTrainScene extends Phaser.Scene {
   }
   previewTurn(turn: Turn | null) {
     this.preview.clear().setAlpha(1);
-    if (turn === null) return;
-    const track = candidate(this.world, turn);
+    const end = this.railEnd();
+    if (turn === null || !end) return;
+    const track = extendCandidate(this.world, end, turn);
+    if (track) drawTrack(this.preview, track, 0.6);
+  }
+  previewBranch(kind: BranchKind | null) {
+    this.preview.clear().setAlpha(1);
+    const cell = this.selectedRail;
+    if (kind === null || !cell) return;
+    const track = branchCandidate(this.world, cell, kind);
     if (track) drawTrack(this.preview, track, 0.6);
   }
   private drawWorld() {
     ground(this.floor, this.world.chunks);
     this.rails.clear();
-    for (const track of this.world.tracks) drawTrack(this.rails, track);
+    // At a switch the route not taken is drawn first and faded.
+    const idle = (t: Track) => isSwitch(this.world, t) && activePiece(this.world, t) !== t;
+    for (const track of this.world.tracks.filter(idle)) drawTrack(this.rails, track, 0.5);
+    for (const track of this.world.tracks.filter((t) => !idle(t)))
+      drawTrack(this.rails, track);
     this.scenery.forEach((g) => g.destroy());
+    const extra: Phaser.GameObjects.Graphics[] = [];
     this.scenery = this.world.decorations.map((d) => {
       const p = project(d);
       const isWater = d.kind === "water";
-      const roadKind =
-        d.kind === "roadAsphalt" || d.kind === "roadDirt" ? d.kind : null;
+      const roadKind = isRoadKind(d.kind) ? d.kind : null;
+      const grassKind = isGrassKind(d.kind) ? d.kind : null;
       const isOverlay = isTrackOverlayKind(d.kind);
       const g = this.add
         .graphics({ x: p.x, y: p.y })
         .setDepth(
-          isWater ? 0.5 : roadKind ? 0.72 : (isOverlay ? 13 : 10) + p.y,
+          grassKind ? 0.4 : isWater ? 0.5 : roadKind ? 0.72 : (isOverlay ? 13 : 10) + p.y,
         );
 
-      if (isWater) {
+      if (grassKind) {
+        grassTile(g, grassKind, connectedDecorationEdges(this.world, d, grassKind));
+      } else if (isWater) {
         waterTile(g, connectedDecorationEdges(this.world, d, d.kind));
       } else if (roadKind) {
         roadTile(
@@ -335,13 +421,22 @@ export class WebTrainScene extends Phaser.Scene {
           connectedDecorationEdges(this.world, d, roadKind),
         );
       } else if (isOverlay) {
+        // Stations and tunnels split into layers so trains pass between them.
         const track = this.world.tracks.find((t) => same(t, d));
-        if (track) trackDecoration(g, d.kind, track);
+        if (track)
+          trackDecorationLayers(d.kind, track).forEach(({ layer, depth }, i) => {
+            const target =
+              i === 0 ? g : this.add.graphics({ x: p.x, y: p.y });
+            target.setDepth(10 + p.y + depth);
+            trackDecoration(target, d.kind, track, layer);
+            if (i > 0) extra.push(target);
+          });
       } else {
         decoration(g, d.kind);
       }
       return g;
     });
+    this.scenery.push(...extra);
     this.marker.clear();
     const first = project(sampleTrack(this.world.tracks[0], 0).point);
     this.marker
@@ -351,54 +446,93 @@ export class WebTrainScene extends Phaser.Scene {
       .lineStyle(3, 0xf3ddaf)
       .lineBetween(first.x - 7, first.y - 14, first.x + 7, first.y - 7);
   }
-  private routeLength() {
-    return this.world.tracks.reduce((sum, t) => sum + trackLength(t), 0);
+  // Keeps the train on the same piece across edits, or restarts it.
+  private syncTrain() {
+    const t = this.trainTrack;
+    const index = t
+      ? this.world.tracks.findIndex(
+          (p) => same(p, t) && p.entry === t.entry && p.exit === t.exit,
+        )
+      : this.trainState.track;
+    if (index < 0 || !this.world.tracks[index])
+      this.trainState = { track: 0, forward: true, t: 0.5 };
+    else this.trainState = { ...this.trainState, track: index };
+    this.trainTrack = this.world.tracks[this.trainState.track];
+    this.trail = [];
+    if (this.selectedRail && !piecesAt(this.world, this.selectedRail).length)
+      this.selectedRail = null;
+  }
+  private toScreen(p: Point) {
+    const camera = this.cameras.main;
+    return {
+      x: (p.x - camera.scrollX - camera.width / 2) * camera.zoom + camera.width / 2,
+      y: (p.y - camera.scrollY - camera.height / 2) * camera.zoom + camera.height / 2,
+    };
+  }
+  private railControls(): RailControls {
+    const cell = this.selectedRail;
+    const none = { end: null, branch: null, toggle: null };
+    if (this.tool !== "track" || !cell) return none;
+    const pieces = piecesAt(this.world, cell);
+    if (!pieces.length) return none;
+    const end = this.railEnd();
+    const center = this.toScreen(project(cell));
+    const controls: RailControls = { ...none };
+    if (end) {
+      const at = sampleTrack(end.track, end.side === end.track.exit ? 1 : 0).point;
+      controls.end = {
+        ...this.toScreen(project(at)),
+        heading: end.side,
+        can: ([-1, 0, 1] as Turn[]).map((turn) => Boolean(extendCandidate(this.world, end, turn))),
+        remove: Boolean(removableTrack(this.world, cell)),
+      };
+    } else if (pieces.length === 1 && pieces[0].entry === pieces[0].exit) {
+      controls.branch = {
+        ...center,
+        heading: pieces[0].entry,
+        can: Object.fromEntries(
+          branchKinds.map((kind) => [kind, Boolean(branchCandidate(this.world, cell, kind))]),
+        ) as Record<BranchKind, boolean>,
+      };
+    }
+    if (pieces.length === 2)
+      controls.toggle = {
+        x: center.x,
+        y: center.y - 30 * this.cameras.main.zoom,
+        thrown: switchThrown(this.world, cell),
+      };
+    return controls;
   }
   update(_time: number, delta: number) {
     if (!this.train) return;
-    const length = this.routeLength();
-    if (this.playing) {
-      this.distance +=
-        (Math.min(delta, 60) / 1000) * this.speed * 1.25 * this.travelDirection;
-      if (this.world.closed) this.distance = (this.distance + length) % length;
-      else if (this.distance >= length - 0.12) {
-        this.distance = length - 0.12;
-        this.travelDirection = -1;
-      } else if (this.distance <= 0.12) {
-        this.distance = 0.12;
-        this.travelDirection = 1;
-      }
-    }
-    const pose = sampleRoute(this.world.tracks, this.distance);
-    const tangent = {
-      x: pose.tangent.x * this.travelDirection,
-      y: pose.tangent.y * this.travelDirection,
-    };
+    if (this.playing)
+      this.trainState =
+        advanceTrain(
+          this.world,
+          this.trainState,
+          (Math.min(delta, 60) / 1000) * this.speed * 1.25,
+          { onEnter: (from) => (this.trail = [from, ...this.trail].slice(0, 6)) },
+        ) ?? this.trainState;
+    this.trainTrack = this.world.tracks[this.trainState.track];
+    const pose = trainPose(this.world, this.trainState);
     this.train.clear();
-    locomotive(this.train, pose.point, tangent);
+    locomotive(this.train, pose.point, pose.tangent);
     this.train.setDepth(10 + project(pose.point).y);
-    const behind = this.distance - 0.52 * this.travelDirection;
+    // The wagon trails behind along the train's own path.
+    const behind = advanceTrain(
+      this.world,
+      { ...this.trainState, forward: !this.trainState.forward },
+      0.52,
+      { stopAtEnd: true, prefer: this.trail },
+    );
     this.carriage.clear();
-    if (this.world.closed || (behind > 0 && behind < length)) {
-      const car = sampleRoute(this.world.tracks, (behind + length) % length);
-      locomotive(this.carriage, car.point, car.tangent, true);
+    if (behind) {
+      const car = trainPose(this.world, behind);
+      locomotive(this.carriage, car.point, { x: -car.tangent.x, y: -car.tangent.y }, true);
       this.carriage.setDepth(10 + project(car.point).y);
     }
-    const last = this.world.tracks.at(-1)!;
-    const endpoint = project(sampleTrack(last, 1).point),
-      camera = this.cameras.main;
-    const x =
-      (endpoint.x - camera.scrollX - camera.width / 2) * camera.zoom +
-      camera.width / 2;
-    const y =
-      (endpoint.y - camera.scrollY - camera.height / 2) * camera.zoom +
-      camera.height / 2;
-    this.onAnchor?.(
-      x,
-      y,
-      this.selected && this.tool === "track" && !this.world.closed,
-      !candidate(this.world, 0),
-    );
+    const camera = this.cameras.main;
+    this.onRailControls?.(this.railControls());
 
     const selectedDecoration =
       this.selectedDecorationIndex === null
@@ -555,15 +689,22 @@ export class WebTrainScene extends Phaser.Scene {
     this.preview.clear();
     if (!inside(cell, this.world) || this.tool === "track" || this.tool === "select") return;
 
-    const decorationAtCell = this.world.decorations.some((d) => same(d, cell));
+    const objectAtCell = this.world.decorations.some(
+      (d) => same(d, cell) && !isGroundLayer(d.kind),
+    );
+    const groundAtCell = this.world.decorations.some(
+      (d) => same(d, cell) && isGroundLayer(d.kind),
+    );
     const trackAtCell = this.world.tracks.find((track) => same(track, cell));
     const overlay = this.tool !== "erase" && isTrackOverlayKind(this.tool);
     const canPlace =
       this.tool === "erase"
-        ? decorationAtCell || Boolean(trackAtCell)
-        : overlay
-          ? Boolean(trackAtCell) && !decorationAtCell
-          : !trackAtCell && !decorationAtCell;
+        ? objectAtCell || groundAtCell || Boolean(trackAtCell)
+        : isGroundLayer(this.tool)
+          ? !groundAtCell
+          : overlay
+            ? Boolean(trackAtCell) && !objectAtCell
+            : !trackAtCell && !objectAtCell;
 
     const pos = project(cell);
     this.preview.save().translateCanvas(pos.x, pos.y);
@@ -571,13 +712,12 @@ export class WebTrainScene extends Phaser.Scene {
 
     if (this.tool !== "erase" && canPlace) {
       this.preview.setAlpha(0.68);
-      const roadKind =
-        this.tool === "roadAsphalt" || this.tool === "roadDirt"
-          ? this.tool
-          : null;
+      const roadKind = isRoadKind(this.tool) ? this.tool : null;
       if (overlay && trackAtCell) trackDecoration(this.preview, this.tool, trackAtCell);
       else if (this.tool === "water")
         waterTile(this.preview, [false, false, false, false]);
+      else if (isGrassKind(this.tool))
+        grassTile(this.preview, this.tool, [false, false, false, false]);
       else if (roadKind)
         roadTile(this.preview, roadKind, [false, false, false, false]);
       else decoration(this.preview, this.tool);
@@ -590,34 +730,53 @@ export class WebTrainScene extends Phaser.Scene {
     const cell = this.cellAt(p);
     if (!inside(cell, this.world)) return;
 
-    const decorationIndex = this.world.decorations.findIndex((d) =>
-      same(d, cell),
-    );
+    const indexOn = (ground: boolean) =>
+      this.world.decorations.findIndex(
+        (d) => same(d, cell) && isGroundLayer(d.kind) === ground,
+      );
+    const objectIndex = indexOn(false);
+    const groundIndex = indexOn(true);
+    const tool = this.tool;
+    const onRail = this.world.tracks.some((t) => same(t, cell));
+    if (tool === "track") {
+      this.selectedRail = onRail ? cell : null;
+      this.selectedDecorationIndex = null;
+      if (!onRail) this.onMessage?.("Uzatmak, makas açmak ya da makası değiştirmek için bir raya dokun.");
+      this.preview.clear();
+      this.emit();
+      return;
+    }
+    if (tool !== "select" && tool !== "erase") {
+      const blocking = isGroundLayer(tool) ? groundIndex : objectIndex;
+      if (blocking < 0) {
+        this.place(cell, tool);
+        return;
+      }
+      // While painting tiles, taps on filled cells keep the brush in hand.
+      if (isTileKind(tool)) {
+        if (this.world.decorations[blocking].kind !== tool)
+          this.onMessage?.("Buraya eklenemiyor. Boş bir kare seç.");
+        return;
+      }
+    }
+
+    // Objects and rails sit on top of grass, so a tap picks them first.
+    const decorationIndex =
+      objectIndex >= 0 ? objectIndex : onRail ? -1 : groundIndex;
     if (decorationIndex >= 0) {
       this.selectedDecorationIndex = decorationIndex;
       this.tool = "select";
-      this.selected = false;
+      this.selectedRail = null;
       this.preview.clear();
       this.emit();
       return;
     }
 
-    if (this.tool === "track") {
-      const last = this.world.tracks.at(-1)!;
-      if (same(cell, last) || same(cell, nextCell(last))) {
-        this.selectedDecorationIndex = null;
-        this.selected = true;
-        this.emit();
-      } else {
-        this.selected = false;
-        this.onMessage?.("Yolu uzatmak için en son raya dokun.");
-      }
-      return;
-    }
-
     if (this.tool === "erase") {
-      if (same(cell, this.world.tracks.at(-1)!)) this.removeLast();
-      else this.onMessage?.("Silmek istediğin nesneye dokun.");
+      if (onRail) {
+        this.selectedRail = cell;
+        this.removeSelectedTrack();
+      } else this.onMessage?.("Silmek istediğin nesneye dokun.");
       return;
     }
 
@@ -625,10 +784,9 @@ export class WebTrainScene extends Phaser.Scene {
       this.selectedDecorationIndex = null;
       this.preview.clear();
       this.emit();
-      return;
     }
-
-    const kind = this.tool;
+  }
+  private place(cell: Point, kind: DecorationKind) {
     const overlay = isTrackOverlayKind(kind);
     this.remember();
     const placed = placeDecoration(this.world, cell, kind);
@@ -642,10 +800,9 @@ export class WebTrainScene extends Phaser.Scene {
       return;
     }
 
-    // Decoration placement is deliberately one-shot for young players.
-    this.tool = "select";
+    // Buildings and props are one-shot for young players; tiles keep painting.
+    if (!isTileKind(kind)) this.tool = "select";
     this.selectedDecorationIndex = null;
-    this.selected = false;
     this.commit();
   }
 }

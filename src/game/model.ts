@@ -14,9 +14,29 @@ export type DecorationKind =
   | "houseBlue"
   | "houseRed"
   | "cottage"
+  | "apartment"
+  | "market"
+  | "bakery"
+  | "cafe"
+  | "mosque"
+  | "library"
+  | "postOffice"
   | "farmhouse"
+  | "smallFarm"
+  | "fireStation"
+  | "policeStation"
+  | "hospital"
+  | "hospitalCrescent"
+  | "school"
+  | "cityHall"
   | "pine"
   | "tree"
+  | "grove"
+  | "pineForest"
+  | "autumnTrees"
+  | "orchard"
+  | "bushes"
+  | "rocks"
   | "treeSmall"
   | "blossom"
   | "flowers"
@@ -24,10 +44,16 @@ export type DecorationKind =
   | "cow"
   | "sheep"
   | "chicken"
+  | "horses"
+  | "goats"
+  | "deer"
   | "pond"
   | "water"
+  | "grassLight"
+  | "grassDark"
   | "roadAsphalt"
   | "roadDirt"
+  | "roadStone"
   | "mountain"
   | "mountainSnow"
   | "windmill"
@@ -67,7 +93,10 @@ export interface World {
   chunks: Chunk[];
   tracks: Track[];
   decorations: Decoration[];
+  // True when the network has no loose ends.
   closed: boolean;
+  // Cells whose switch is set to the branch; others take the straight way.
+  switches?: string[];
 }
 
 export const vectors: Point[] = [
@@ -97,9 +126,29 @@ export const kinds: DecorationKind[] = [
   "houseBlue",
   "houseRed",
   "cottage",
+  "apartment",
+  "market",
+  "bakery",
+  "cafe",
+  "mosque",
+  "library",
+  "postOffice",
   "farmhouse",
+  "smallFarm",
+  "fireStation",
+  "policeStation",
+  "hospital",
+  "hospitalCrescent",
+  "school",
+  "cityHall",
   "pine",
   "tree",
+  "grove",
+  "pineForest",
+  "autumnTrees",
+  "orchard",
+  "bushes",
+  "rocks",
   "treeSmall",
   "blossom",
   "flowers",
@@ -107,10 +156,16 @@ export const kinds: DecorationKind[] = [
   "cow",
   "sheep",
   "chicken",
+  "horses",
+  "goats",
+  "deer",
   "pond",
   "water",
+  "grassLight",
+  "grassDark",
   "roadAsphalt",
   "roadDirt",
+  "roadStone",
   "mountain",
   "mountainSnow",
   "windmill",
@@ -140,6 +195,27 @@ export const trackOverlayKinds: DecorationKind[] = [
   "tunnelStone",
   "tunnelGreen",
 ];
+
+export const grassKinds = ["grassLight", "grassDark"] as const;
+export type GrassKind = (typeof grassKinds)[number];
+export const isGrassKind = (kind: Tool): kind is GrassKind =>
+  (grassKinds as readonly Tool[]).includes(kind);
+
+export const roadKinds = ["roadAsphalt", "roadDirt", "roadStone"] as const;
+export type RoadKind = (typeof roadKinds)[number];
+export const isRoadKind = (kind: Tool): kind is RoadKind =>
+  (roadKinds as readonly Tool[]).includes(kind);
+
+// Grass is ground cover: a cell can hold one patch of it under a track or
+// another object, so it lives on its own layer.
+export const isGroundLayer = (kind: DecorationKind) => isGrassKind(kind);
+const sameLayer = (a: DecorationKind, b: DecorationKind) =>
+  isGroundLayer(a) === isGroundLayer(b);
+
+// Tile kinds are painted: the tool stays selected so neighbouring tiles can
+// be laid one after another.
+export const isTileKind = (kind: Tool) =>
+  kind === "water" || isGrassKind(kind) || isRoadKind(kind);
 
 export const isTrackOverlayKind = (kind: DecorationKind) =>
   trackOverlayKinds.includes(kind);
@@ -191,30 +267,265 @@ export const nextCell = (track: Track): Point => ({
   y: track.y + vectors[track.exit].y,
 });
 
-export function candidate(world: World, turn: Turn): Track | null {
-  if (world.closed || !world.tracks.length) return null;
-  const last = world.tracks.at(-1)!;
-  const cell = nextCell(last);
+// The rails form a small network. A cell holds one piece, or two at a
+// switch: a straight piece plus a curve that shares one of its ends.
+// Pieces join whenever their ends meet across a cell edge.
+export interface RailEnd {
+  track: Track;
+  side: Heading;
+}
+export type BranchKind = "forwardLeft" | "forwardRight" | "backLeft" | "backRight";
+export const branchKinds: BranchKind[] = ["forwardLeft", "forwardRight", "backLeft", "backRight"];
+
+export const cellKey = (p: Point) => `${p.x},${p.y}`;
+export const sidesOf = (t: Track): [Heading, Heading] => [
+  ((t.entry + 2) % 4) as Heading,
+  t.exit,
+];
+const step = (p: Point, side: number): Point => ({
+  x: p.x + vectors[side].x,
+  y: p.y + vectors[side].y,
+});
+export const piecesAt = (world: Pick<World, "tracks">, cell: Point) =>
+  world.tracks.filter((t) => same(t, cell));
+export const isSwitch = (world: Pick<World, "tracks">, cell: Point) =>
+  piecesAt(world, cell).length === 2;
+export const switchThrown = (world: World, cell: Point) =>
+  (world.switches ?? []).includes(cellKey(cell));
+
+// Pieces in the neighbouring cell whose end meets this side.
+export function linked(world: Pick<World, "tracks">, track: Track, side: number) {
+  const cell = step(track, side);
+  const back = (side + 2) % 4;
+  return world.tracks.filter((t) => same(t, cell) && sidesOf(t).includes(back as Heading));
+}
+
+export function openEnds(world: Pick<World, "tracks">): RailEnd[] {
+  const seen = new Set<string>();
+  const ends: RailEnd[] = [];
+  for (const track of world.tracks)
+    for (const side of sidesOf(track)) {
+      const key = `${cellKey(track)},${side}`;
+      if (seen.has(key) || linked(world, track, side).length) continue;
+      seen.add(key);
+      ends.push({ track, side });
+    }
+  return ends;
+}
+const isClosed = (world: Pick<World, "tracks">) => openEnds(world).length === 0;
+
+// The piece a train takes when it reaches a switch from its shared end.
+export function activePiece(world: World, cell: Point): Track {
+  const pieces = piecesAt(world, cell);
+  if (pieces.length < 2) return pieces[0];
+  const thrown = switchThrown(world, cell);
+  return pieces.find((t) => (t.entry !== t.exit) === thrown) ?? pieces[0];
+}
+
+export function extendCandidate(world: World, end: RailEnd, turn: Turn): Track | null {
+  if (linked(world, end.track, end.side).length) return null;
+  const cell = step(end.track, end.side);
   if (
     !inside(cell, world) ||
     world.tracks.some((p) => same(p, cell)) ||
-    world.decorations.some((p) => same(p, cell))
+    world.decorations.some((p) => same(p, cell) && !isGroundLayer(p.kind))
   )
     return null;
-  return {
-    ...cell,
-    entry: last.exit,
-    exit: ((last.exit + turn + 4) % 4) as Heading,
-  };
+  return { ...cell, entry: end.side, exit: ((end.side + turn + 4) % 4) as Heading };
+}
+export function extendFrom(world: World, end: RailEnd, turn: Turn): Track | null {
+  const track = extendCandidate(world, end, turn);
+  if (!track) return null;
+  world.tracks.push(track);
+  world.closed = isClosed(world);
+  return track;
 }
 
+// The newest piece's far end, used by the starter world and older callers.
+const lastEnd = (world: World): RailEnd => {
+  const last = world.tracks.at(-1)!;
+  return { track: last, side: last.exit };
+};
+export function candidate(world: World, turn: Turn): Track | null {
+  if (!world.tracks.length) return null;
+  return extendCandidate(world, lastEnd(world), turn);
+}
 export function appendTrack(world: World, turn: Turn): boolean {
-  const track = candidate(world, turn);
+  return Boolean(world.tracks.length && extendFrom(world, lastEnd(world), turn));
+}
+
+// A branch turns a straight piece into a switch. "Forward" follows the
+// piece's own direction; left and right are as seen while travelling.
+export function branchCandidate(world: World, cell: Point, kind: BranchKind): Track | null {
+  const pieces = piecesAt(world, cell);
+  if (pieces.length !== 1 || pieces[0].entry !== pieces[0].exit) return null;
+  if (world.decorations.some((d) => same(d, cell) && isTrackOverlayKind(d.kind))) return null;
+  const heading = kind.startsWith("back") ? (pieces[0].entry + 2) % 4 : pieces[0].entry;
+  const exit = (heading + (kind.endsWith("Right") ? 1 : 3)) % 4;
+  const next = step(cell, exit);
+  if (!inside(next, world)) return null;
+  if (world.decorations.some((d) => same(d, next) && !isGroundLayer(d.kind))) return null;
+  const there = piecesAt(world, next);
+  if (there.length && !there.some((t) => sidesOf(t).includes(((exit + 2) % 4) as Heading)))
+    return null;
+  return { ...cell, entry: heading as Heading, exit: exit as Heading };
+}
+export function addBranch(world: World, cell: Point, kind: BranchKind): boolean {
+  const track = branchCandidate(world, cell, kind);
   if (!track) return false;
   world.tracks.push(track);
-  const first = world.tracks[0];
-  world.closed = same(nextCell(track), first) && track.exit === first.entry;
+  world.closed = isClosed(world);
   return true;
+}
+
+export function toggleSwitch(world: World, cell: Point): boolean {
+  if (!isSwitch(world, cell)) return false;
+  const key = cellKey(cell);
+  const list = world.switches ?? [];
+  const next = list.includes(key) ? list.filter((k) => k !== key) : [...list, key];
+  if (next.length) world.switches = next;
+  else delete world.switches;
+  return true;
+}
+
+// Only loose ends can be removed, so the network always stays in one piece.
+export function removableTrack(world: World, cell: Point): Track | null {
+  if (world.tracks.length <= 1) return null;
+  const pieces = piecesAt(world, cell);
+  if (pieces.length === 2) {
+    const branch = pieces.find((t) => t.entry !== t.exit)!;
+    const other = pieces.find((t) => t !== branch)!;
+    const own = sidesOf(branch).find((s) => !sidesOf(other).includes(s))!;
+    return linked(world, branch, own).length ? null : branch;
+  }
+  const [track] = pieces;
+  if (!track) return null;
+  return sidesOf(track).some((s) => !linked(world, track, s).length) ? track : null;
+}
+export function removeTrack(world: World, cell: Point): boolean {
+  const track = removableTrack(world, cell);
+  if (!track) return false;
+  world.tracks.splice(world.tracks.indexOf(track), 1);
+  const key = cellKey(cell);
+  if (world.switches?.includes(key)) {
+    world.switches = world.switches.filter((k) => k !== key);
+    if (!world.switches.length) delete world.switches;
+  }
+  if (!piecesAt(world, cell).length)
+    world.decorations = world.decorations.filter(
+      (d) => !(same(d, cell) && isTrackOverlayKind(d.kind)),
+    );
+  world.closed = isClosed(world);
+  return true;
+}
+
+// Checks the shape of a loaded network: valid pieces, proper switches and
+// every piece reachable from the first one.
+function validNetwork(world: World): boolean {
+  const cells = new Map<string, Track[]>();
+  for (const t of world.tracks) {
+    if (
+      !t ||
+      !inside(t, world) ||
+      ![0, 1, 2, 3].includes(t.entry) ||
+      ![0, 1, 2, 3].includes(t.exit) ||
+      (t.entry + 2) % 4 === t.exit
+    )
+      return false;
+    const key = cellKey(t);
+    cells.set(key, [...(cells.get(key) ?? []), t]);
+  }
+  for (const pieces of cells.values()) {
+    if (pieces.length > 2) return false;
+    if (pieces.length === 2) {
+      const [a, b] = pieces;
+      const shared = sidesOf(a).filter((s) => sidesOf(b).includes(s));
+      if (shared.length !== 1 || (a.entry === a.exit) === (b.entry === b.exit)) return false;
+    }
+  }
+  const reached = new Set<Track>([world.tracks[0]]);
+  const queue = [world.tracks[0]];
+  while (queue.length) {
+    const t = queue.pop()!;
+    const next = [
+      ...piecesAt(world, t),
+      ...sidesOf(t).flatMap((s) => linked(world, t, s)),
+    ];
+    for (const n of next)
+      if (!reached.has(n)) {
+        reached.add(n);
+        queue.push(n);
+      }
+  }
+  if (reached.size !== world.tracks.length) return false;
+  if (world.switches !== undefined) {
+    if (!Array.isArray(world.switches) || !world.switches.length) return false;
+    if (new Set(world.switches).size !== world.switches.length) return false;
+    if (world.switches.some((k) => typeof k !== "string" || cells.get(k)?.length !== 2))
+      return false;
+  }
+  return world.closed === isClosed(world);
+}
+
+// A train is a position on one piece: t runs along the stored direction and
+// forward says whether it travels that way.
+export interface TrainState {
+  track: number;
+  forward: boolean;
+  t: number;
+}
+const exitSide = (track: Track, forward: boolean) =>
+  forward ? track.exit : (((track.entry + 2) % 4) as Heading);
+
+// The next piece past an end: switches decide when the train meets their
+// shared end; prefer lets a trailing wagon follow the train's own path.
+function nextPiece(world: World, track: Track, side: Heading, prefer: Track[] = []) {
+  const options = linked(world, track, side);
+  if (options.length < 2) return options[0];
+  return options.find((t) => prefer.includes(t)) ?? activePiece(world, step(track, side));
+}
+
+// Moves a train along the network. At a dead end it turns around unless
+// stopAtEnd is set, in which case null means it ran out of rail.
+export function advanceTrain(
+  world: World,
+  state: TrainState,
+  distance: number,
+  { stopAtEnd = false, prefer = [] as Track[], onEnter }: {
+    stopAtEnd?: boolean;
+    prefer?: Track[];
+    onEnter?: (from: Track) => void;
+  } = {},
+): TrainState | null {
+  let { track: index, forward } = state;
+  let track = world.tracks[index];
+  let u = (forward ? state.t : 1 - state.t) + distance / trackLength(track);
+  for (let guard = 0; guard < 64; guard++) {
+    const side = exitSide(track, forward);
+    const next = nextPiece(world, track, side, prefer);
+    const limit = next || stopAtEnd ? 1 : 1 - 0.12 / trackLength(track);
+    if (u <= limit) break;
+    const overflow = (u - limit) * trackLength(track);
+    if (!next) {
+      if (stopAtEnd) return null;
+      forward = !forward;
+      u = 1 - limit + overflow / trackLength(track);
+      continue;
+    }
+    onEnter?.(track);
+    const entering = (side + 2) % 4;
+    forward = (next.entry + 2) % 4 === entering;
+    track = next;
+    index = world.tracks.indexOf(next);
+    u = overflow / trackLength(track);
+  }
+  return { track: index, forward, t: forward ? u : 1 - u };
+}
+
+export function trainPose(world: World, state: TrainState) {
+  const { point, tangent } = sampleTrack(world.tracks[state.track], state.t);
+  const sign = state.forward ? 1 : -1;
+  return { point, tangent: { x: tangent.x * sign, y: tangent.y * sign } };
 }
 
 export function placeDecoration(
@@ -222,13 +533,21 @@ export function placeDecoration(
   cell: Point,
   kind: DecorationKind,
 ): boolean {
-  if (!inside(cell, world) || world.decorations.some((p) => same(p, cell)))
+  if (
+    !inside(cell, world) ||
+    world.decorations.some((p) => same(p, cell) && sameLayer(p.kind, kind))
+  )
     return false;
+  if (isGroundLayer(kind)) {
+    world.decorations.push({ ...cell, kind });
+    return true;
+  }
 
-  const hasTrack = world.tracks.some((p) => same(p, cell));
+  const pieces = world.tracks.filter((p) => same(p, cell)).length;
   if (isTrackOverlayKind(kind)) {
-    if (!hasTrack) return false;
-  } else if (hasTrack) {
+    // Stations and tunnels need a plain piece of rail, not a switch.
+    if (pieces !== 1) return false;
+  } else if (pieces) {
     return false;
   }
 
@@ -299,46 +618,22 @@ export function parseWorld(raw: string | null): World | null {
     if (chunkKeys.size !== chunks.length) return null;
     data.chunks = chunks;
 
-    const trackCells = new Set<string>();
-    for (const t of data.tracks) {
-      if (!t || !inside(t, data)) return null;
-      const key = `${t.x},${t.y}`;
-      if (trackCells.has(key)) return null;
-      trackCells.add(key);
-    }
+    if (!validNetwork(data as World)) return null;
+    const trackCells = new Map<string, number>();
+    for (const t of data.tracks)
+      trackCells.set(`${t.x},${t.y}`, (trackCells.get(`${t.x},${t.y}`) ?? 0) + 1);
 
     const decorationCells = new Set<string>();
     for (const d of data.decorations) {
       if (!d || !inside(d, data) || !kinds.includes(d.kind)) return null;
-      const key = `${d.x},${d.y}`;
+      const cell = `${d.x},${d.y}`;
+      const key = `${cell},${isGroundLayer(d.kind) ? "ground" : "object"}`;
       if (decorationCells.has(key)) return null;
       decorationCells.add(key);
-      const hasTrack = trackCells.has(key);
-      if (isTrackOverlayKind(d.kind) ? !hasTrack : hasTrack) return null;
+      if (isGroundLayer(d.kind)) continue;
+      const pieces = trackCells.get(cell) ?? 0;
+      if (isTrackOverlayKind(d.kind) ? pieces !== 1 : pieces > 0) return null;
     }
-
-    for (let i = 0; i < data.tracks.length; i++) {
-      const t = data.tracks[i];
-      if (
-        ![0, 1, 2, 3].includes(t.entry) ||
-        ![0, 1, 2, 3].includes(t.exit) ||
-        (t.entry + 2) % 4 === t.exit
-      )
-        return null;
-      if (
-        i &&
-        (!same(nextCell(data.tracks[i - 1]), t) ||
-          data.tracks[i - 1].exit !== t.entry)
-      )
-        return null;
-    }
-
-    const last = data.tracks.at(-1);
-    const first = data.tracks[0];
-    if (
-      data.closed !== (same(nextCell(last), first) && last.exit === first.entry)
-    )
-      return null;
 
     return data as World;
   } catch {
