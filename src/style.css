@@ -3267,7 +3267,7 @@ button.game-logo:focus-visible {
 .road-mode-panel {
   position: fixed;
   z-index: 18;
-  top: 94px;
+  top: 103px;
   left: 12px;
   width: 122px;
   padding: 5px;
@@ -3334,7 +3334,7 @@ button.game-logo:focus-visible {
   }
 
   .road-mode-panel {
-    top: 84px;
+    top: 90px;
     left: 8px;
     width: 114px;
     padding: 4px;
