@@ -26,6 +26,8 @@ export type DecorationKind =
   | "chicken"
   | "pond"
   | "water"
+  | "roadAsphalt"
+  | "roadDirt"
   | "mountain"
   | "mountainSnow"
   | "windmill"
@@ -75,6 +77,21 @@ export const vectors: Point[] = [
   { x: 0, y: -1 },
 ];
 
+export function connectedDecorationEdges(
+  world: Pick<World, "decorations">,
+  cell: Point,
+  kind: DecorationKind,
+): boolean[] {
+  return vectors.map((vector) =>
+    world.decorations.some(
+      (decoration) =>
+        decoration.kind === kind &&
+        decoration.x === cell.x + vector.x &&
+        decoration.y === cell.y + vector.y,
+    ),
+  );
+}
+
 export const kinds: DecorationKind[] = [
   "house",
   "houseBlue",
@@ -92,6 +109,8 @@ export const kinds: DecorationKind[] = [
   "chicken",
   "pond",
   "water",
+  "roadAsphalt",
+  "roadDirt",
   "mountain",
   "mountainSnow",
   "windmill",
