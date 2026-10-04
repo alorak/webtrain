@@ -8,6 +8,7 @@ const paths: Record<string, string> = {
     '<rect x="4" y="8" width="14" height="10" rx="3"/><path d="M7 8V4h7v4M18 11h3v7H3M7 21h.01M16 21h.01M8 12h5"/>',
   track: '<path d="m7 3-3 18M17 3l3 18M6 7h12M5 12h14M4 18h16"/>',
   tree: '<path d="m12 2-7 9h3l-5 7h18l-5-7h3L12 2ZM12 18v4"/>',
+  house: '<path d="M3 11 12 3l9 8v10h-6v-6H9v6H3Z"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .6-1.5 1-1.5 2M12 17h.01"/>',
   undo: '<path d="M8 4 3 9l5 5M3 9h11a6 6 0 0 1 0 12"/>',
   redo: '<path d="m16 4 5 5-5 5M21 9H10a6 6 0 0 0 0 12"/>',
@@ -38,30 +39,20 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
 const items: {
   kind: DecorationKind;
   name: string;
-  category: string;
+  category: "nature" | "buildings";
   color: string;
 }[] = [
-  { kind: "house", name: "Minik ev", category: "buildings", color: "peach" },
-  { kind: "pine", name: "Çam ağacı", category: "nature", color: "sage" },
-  { kind: "tree", name: "Koca çınar", category: "nature", color: "sage" },
-  { kind: "pond", name: "Ördekli gölet", category: "nature", color: "blue" },
-  { kind: "ferris", name: "Dönme dolap", category: "fun", color: "peach" },
-  { kind: "waterfall", name: "Şelale", category: "nature", color: "blue" },
-  { kind: "tent", name: "Kamp yeri", category: "buildings", color: "sand" },
-  {
-    kind: "windmill",
-    name: "Yel değirmeni",
-    category: "buildings",
-    color: "sand",
-  },
-  { kind: "balloon", name: "Uçan balon", category: "fun", color: "peach" },
+  { kind: "tree", name: "Ağaç", category: "nature", color: "sage" },
+  { kind: "duck", name: "Hayvan", category: "nature", color: "sun" },
+  { kind: "house", name: "Ev", category: "buildings", color: "peach" },
 ];
 $("decoration-grid").innerHTML = items
-  .map(
-    (item) =>
-      `<button class="decor-card ${item.color}" data-kind="${item.kind}" data-group="${item.category}" aria-label="${item.name} ekle" aria-pressed="false"><span class="card-plus">+</span><img alt="" draggable="false"/><span>${item.name}</span></button>`,
-  )
+  .map((item) => {
+    const hidden = item.category === "nature" ? "" : " hidden";
+    return `<button class="decor-card ${item.color}" data-kind="${item.kind}" data-group="${item.category}" aria-label="${item.name} ekle" aria-pressed="false"${hidden}><img alt="" draggable="false"/></button>`;
+  })
   .join("");
+
 const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game-root",
@@ -76,7 +67,25 @@ const game = new Phaser.Game({
   scene: [WebTrainScene],
 });
 let scene: WebTrainScene;
-let lastDecoration: DecorationKind = "house";
+let lastDecoration: DecorationKind = "tree";
+type SidePanel = "nature" | "buildings" | "track" | "train";
+let activePanel: SidePanel = "nature";
+
+function showPanel(panel: SidePanel) {
+  activePanel = panel;
+  const category =
+    panel === "nature" ? "nature" : panel === "buildings" ? "buildings" : null;
+  const grid = $("decoration-grid");
+  grid.hidden = category === null;
+  grid.querySelectorAll<HTMLButtonElement>("[data-group]").forEach((button) => {
+    button.hidden = category !== null && button.dataset.group !== category;
+  });
+  document.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach((button) => {
+    const active = button.dataset.panel === panel;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+}
 let speed = 1;
 let toastTimer: ReturnType<typeof setTimeout>;
 function toast(message: string) {
@@ -86,20 +95,17 @@ function toast(message: string) {
   toastTimer = setTimeout(() => $("toast").classList.remove("visible"), 3400);
 }
 function refresh(status: GameStatus) {
-  const isDecor = status.tool !== "track" && status.tool !== "erase";
-  for (const [id, active] of [
-    ["track-tool", status.tool === "track"],
-    ["decor-mode", isDecor],
-    ["erase-tool", status.tool === "erase"],
-  ] as const) {
-    $(id).classList.toggle("active", active);
-    $(id).setAttribute("aria-pressed", String(active));
-  }
   document.querySelectorAll<HTMLElement>("[data-kind]").forEach((el) => {
     const active = el.dataset.kind === status.tool;
     el.classList.toggle("selected", active);
     el.setAttribute("aria-pressed", String(active));
   });
+  document.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach((button) => {
+    const active = button.dataset.panel === activePanel;
+    button.classList.toggle("active", active);
+    button.setAttribute("aria-pressed", String(active));
+  });
+  $("train-tool").classList.toggle("playing", status.playing);
   $<HTMLButtonElement>("undo").disabled = !status.canUndo;
   $<HTMLButtonElement>("redo").disabled = !status.canRedo;
   $("track-count").textContent = String(status.world.tracks.length);
@@ -123,16 +129,8 @@ function refresh(status: GameStatus) {
   document
     .querySelectorAll<SVGElement>("[data-turn] svg")
     .forEach((svg) => (svg.style.transform = `rotate(${angle}deg)`));
-  const label = items.find((i) => i.kind === status.tool)?.name;
-  $("tool-hint").innerHTML =
-    status.tool === "track"
-      ? status.world.closed
-        ? "<strong>Rota tamamlandı!</strong><br>Trenini yolculuğa çıkar."
-        : "<strong>Rayın ucuna dokun.</strong><br>Bir yön seç, yolculuğu uzat."
-      : status.tool === "erase"
-        ? "<strong>Bir parçaya dokun.</strong><br>Dekorları veya son rayı kaldır."
-        : `<strong>${label} seçildi.</strong><br>Yerleştirmek için boş bir kareye dokun.`;
 }
+
 game.events.once("world-ready", (ready: WebTrainScene) => {
   scene = ready;
   scene.onChange = refresh;
@@ -152,7 +150,7 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
       y > 55 &&
       y <
         window.innerHeight -
-          (window.innerWidth < 760 ? 140 : window.innerHeight < 550 ? 85 : 112);
+          (window.innerWidth < 760 ? 70 : window.innerHeight < 550 ? 65 : 70);
     el.hidden = !shown;
     const center = Math.max(98, Math.min(right - 92, x));
     el.style.left = `${center}px`;
@@ -186,9 +184,24 @@ const bind = (id: string, fn: () => void) =>
   $(id).addEventListener("click", () => {
     if (scene) fn();
   });
-bind("track-tool", () => scene.setTool("track"));
-bind("decor-mode", () => scene.setTool(lastDecoration));
-bind("erase-tool", () => scene.setTool("erase"));
+bind("panel-nature", () => {
+  showPanel("nature");
+  lastDecoration = "tree";
+  scene.setTool("tree");
+});
+bind("panel-home", () => {
+  showPanel("buildings");
+  lastDecoration = "house";
+  scene.setTool("house");
+});
+bind("track-tool", () => {
+  showPanel("track");
+  scene.setTool("track");
+});
+bind("train-tool", () => {
+  showPanel("train");
+  scene.setPlaying();
+});
 bind("play", () => scene.setPlaying());
 bind("speed", () => {
   speed = speed === 1 ? 2 : speed === 2 ? 0.5 : 1;
@@ -215,29 +228,14 @@ document
 document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
   (button) =>
     (button.onclick = () => {
-      lastDecoration = button.dataset.kind as DecorationKind;
-      scene?.setTool(lastDecoration);
+      const kind = button.dataset.kind as DecorationKind;
+      const panel = button.dataset.group as "nature" | "buildings";
+      lastDecoration = kind;
+      showPanel(panel);
+      scene?.setTool(kind);
     }),
 );
-document.querySelectorAll<HTMLButtonElement>("[data-category]").forEach(
-  (button) =>
-    (button.onclick = () => {
-      document
-        .querySelectorAll<HTMLButtonElement>("[data-category]")
-        .forEach((b) => {
-          b.classList.toggle("active", b === button);
-          b.setAttribute("aria-pressed", String(b === button));
-        });
-      document
-        .querySelectorAll<HTMLButtonElement>("[data-group]")
-        .forEach(
-          (card) =>
-            (card.hidden =
-              button.dataset.category !== "all" &&
-              card.dataset.group !== button.dataset.category),
-        );
-    }),
-);
+
 const help = $<HTMLDialogElement>("help-dialog"),
   reset = $<HTMLDialogElement>("reset-dialog");
 $("help-button").onclick = () => help.showModal();
