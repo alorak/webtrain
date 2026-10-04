@@ -507,6 +507,7 @@ export class WebTrainScene extends Phaser.Scene {
       now < this.dwellUntil;
     return {
       kind: station.kind,
+      name: station.name,
       closed: Boolean(station.closed),
       dwell: stationDwell(station),
       waiting,
@@ -518,7 +519,11 @@ export class WebTrainScene extends Phaser.Scene {
     if (!cell) this.setStationView(null);
     this.onStation?.(this.selectedStation);
   }
-  setStationSettings(settings: { closed?: boolean; dwell?: number }) {
+  setStationSettings(settings: {
+    closed?: boolean;
+    dwell?: number;
+    name?: string;
+  }) {
     if (!this.selectedStation) return;
     this.remember();
     setStation(this.world, this.selectedStation, settings);

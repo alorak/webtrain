@@ -91,6 +91,7 @@ export interface Decoration extends Point {
   // them for dwell seconds. Defaults are left out of saves.
   closed?: boolean;
   dwell?: number;
+  name?: string;
 }
 export interface World {
   version: 1;
@@ -642,7 +643,11 @@ export const stationAt = (world: Pick<World, "decorations">, cell: Point) =>
 export function setStation(
   world: World,
   cell: Point,
-  { closed, dwell }: { closed?: boolean; dwell?: number },
+  {
+    closed,
+    dwell,
+    name,
+  }: { closed?: boolean; dwell?: number; name?: string },
 ): boolean {
   const station = stationAt(world, cell);
   if (!station) return false;
@@ -654,6 +659,11 @@ export function setStation(
     const value = Math.min(MAX_DWELL, Math.max(1, Math.round(dwell)));
     if (value === DEFAULT_DWELL) delete station.dwell;
     else station.dwell = value;
+  }
+  if (name !== undefined) {
+    const value = name.trim().replace(/\s+/g, " ").slice(0, 32);
+    if (value) station.name = value;
+    else delete station.name;
   }
   return true;
 }
@@ -789,10 +799,17 @@ export function parseWorld(raw: string | null): World | null {
       if (isGroundLayer(d.kind)) continue;
       const pieces = trackCells.get(cell) ?? 0;
       if (isTrackOverlayKind(d.kind) ? pieces !== 1 : pieces > 0) return null;
-      if (d.closed !== undefined || d.dwell !== undefined) {
+      if (d.closed !== undefined || d.dwell !== undefined || d.name !== undefined) {
         if (!isStationKind(d.kind)) return null;
         if (d.closed !== undefined && typeof d.closed !== "boolean") return null;
         if (d.dwell !== undefined && !validDwell(d.dwell)) return null;
+        if (
+          d.name !== undefined &&
+          (typeof d.name !== "string" ||
+            !d.name.trim() ||
+            d.name.length > 32)
+        )
+          return null;
       }
     }
 

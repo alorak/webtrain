@@ -278,14 +278,41 @@
         aria-labelledby="station-title"
         hidden
       >
-        <header>
-          <h2 id="station-title">İstasyon</h2>
-          <button
-            id="close-station"
-            class="icon-button"
-            aria-label="İstasyon penceresini kapat"
-            data-icon="close"
-          ></button>
+        <header class="station-header">
+          <div class="station-title-area">
+            <h2 id="station-title">İstasyon</h2>
+            <input
+              id="station-name-input"
+              class="station-name-input"
+              type="text"
+              maxlength="32"
+              aria-label="İstasyon adı"
+              hidden
+            />
+          </div>
+          <div class="station-header-actions">
+            <button
+              id="rename-station"
+              class="icon-button"
+              aria-label="İstasyon adını değiştir"
+              title="İstasyon adını değiştir"
+              data-icon="edit"
+            ></button>
+            <button
+              id="hide-station"
+              class="icon-button"
+              aria-label="İstasyon kutusunu gizle"
+              title="Gizle"
+              data-icon="eyeOff"
+            ></button>
+            <button
+              id="close-station"
+              class="icon-button"
+              aria-label="İstasyon penceresini kapat"
+              title="Kapat"
+              data-icon="close"
+            ></button>
+          </div>
         </header>
         <div class="station-body">
           <div
@@ -310,6 +337,15 @@
           </div>
         </div>
       </section>
+      <button
+        id="station-chip"
+        class="station-chip"
+        type="button"
+        aria-label="Gizli istasyon kutusunu aç"
+        hidden
+      >
+        <span id="station-chip-name">İstasyon</span>
+      </button>
       <dialog id="help-dialog">
         <button
           class="dialog-close icon-button"

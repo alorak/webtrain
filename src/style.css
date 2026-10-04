@@ -3351,3 +3351,185 @@ button.game-logo:focus-visible {
     height: 31px;
   }
 }
+
+
+/* Compact editable/collapsible station card */
+.station-panel {
+  left: 12px;
+  bottom: 12px;
+  width: min(252px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px);
+  padding: 9px 9px 10px;
+  border-radius: 16px;
+}
+
+.station-header {
+  gap: 6px;
+  padding: 0 0 7px !important;
+}
+
+.station-title-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.station-panel h2 {
+  overflow: hidden;
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.station-name-input {
+  width: 100%;
+  height: 29px;
+  box-sizing: border-box;
+  padding: 4px 7px;
+  border: 1.5px solid #cfd8c1;
+  border-radius: 8px;
+  outline: none;
+  background: #fffef8;
+  color: #405742;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.station-name-input:focus {
+  border-color: #5b8b67;
+  box-shadow: 0 0 0 2px rgb(91 139 103 / 14%);
+}
+
+.station-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 2px;
+}
+
+.station-header-actions .icon-button {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.station-header-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.station-body {
+  gap: 6px;
+}
+
+.station-view {
+  height: 116px;
+  border-radius: 6px;
+}
+
+.station-lights {
+  gap: 6px;
+  padding: 5px;
+  border-radius: 10px;
+}
+
+.station-light {
+  width: 25px;
+  height: 25px;
+  border-width: 2px;
+}
+
+.station-row {
+  gap: 7px;
+  margin-top: 7px;
+  padding: 6px 7px 6px 9px;
+  border-radius: 10px;
+}
+
+.station-status {
+  font-size: 10.5px;
+}
+
+.station-status.waiting {
+  font-size: 13px;
+}
+
+.station-row .stepper {
+  gap: 3px;
+}
+
+.station-row .stepper button {
+  width: 27px;
+  height: 27px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.station-chip {
+  position: fixed;
+  z-index: 30;
+  left: 12px;
+  bottom: 12px;
+  max-width: min(220px, calc(100vw - 24px));
+  min-height: 38px;
+  padding: 8px 13px;
+  border: 1px solid rgb(74 101 77 / 14%);
+  border-radius: 13px;
+  overflow: hidden;
+  background: rgb(255 253 245 / 95%);
+  box-shadow: 0 7px 20px rgb(45 66 48 / 16%);
+  color: #405742;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  backdrop-filter: blur(7px);
+}
+
+.station-chip:hover,
+.station-chip:focus-visible {
+  background: #f4f6e9;
+  border-color: rgb(63 116 86 / 32%);
+}
+
+@media (max-width: 759px) {
+  .station-panel {
+    left: 8px;
+    bottom: 8px;
+    width: min(226px, calc(100vw - 16px));
+    max-height: calc(100vh - 16px);
+    padding: 8px;
+    border-radius: 15px;
+  }
+
+  .station-panel h2 {
+    font-size: 13px;
+  }
+
+  .station-header-actions .icon-button {
+    width: 26px;
+    height: 26px;
+  }
+
+  .station-view {
+    height: 98px;
+  }
+
+  .station-light {
+    width: 23px;
+    height: 23px;
+  }
+
+  .station-chip {
+    left: 8px;
+    bottom: 8px;
+    max-width: min(190px, calc(100vw - 16px));
+    min-height: 36px;
+    padding: 7px 11px;
+    border-radius: 12px;
+    font-size: 11px;
+  }
+}
