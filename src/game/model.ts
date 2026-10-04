@@ -7,13 +7,16 @@ export type DecorationKind =
   | "pine"
   | "tree"
   | "duck"
+  | "cow"
+  | "sheep"
   | "pond"
+  | "mountain"
   | "windmill"
   | "balloon"
   | "ferris"
   | "waterfall"
   | "tent";
-export type Tool = "track" | "erase" | DecorationKind;
+export type Tool = "select" | "track" | "erase" | DecorationKind;
 export interface Point {
   x: number;
   y: number;
@@ -42,7 +45,10 @@ export const kinds: DecorationKind[] = [
   "pine",
   "tree",
   "duck",
+  "cow",
+  "sheep",
   "pond",
+  "mountain",
   "windmill",
   "balloon",
   "ferris",
