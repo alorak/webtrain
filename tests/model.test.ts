@@ -11,6 +11,7 @@ import {
   openEnds,
   removableTrack,
   removeTrack,
+  penLinks,
   doorsOnRoad,
   entrances,
   roadAtEntrance,
@@ -337,4 +338,29 @@ test("roads in front of a door reach up to it", () => {
   // Trees have no door.
   assert.equal(roadAtEntrance(world, tree), null);
   assert.deepEqual(doorsOnRoad(world, { x: 12, y: 13 }), [null, null, null, null]);
+});
+
+test("neighbouring animal pens of any kind join into one", () => {
+  const world = fresh();
+  for (const [x, y, kind] of [
+    [10, 10, "cow"],
+    [11, 10, "sheep"],
+    [10, 11, "goats"],
+    [11, 11, "chicken"],
+    [13, 13, "duck"],
+    [14, 14, "horses"],
+    [12, 10, "tree"],
+  ] as const)
+    assert.ok(placeDecoration(world, { x, y }, kind));
+  assert.deepEqual(penLinks(world, { x: 10, y: 10 }), {
+    sides: [true, true, false, false],
+    corners: [true, false, false, false],
+  });
+  // A tree beside a pen does not join it.
+  assert.deepEqual(penLinks(world, { x: 11, y: 10 }).sides, [false, true, true, false]);
+  // Diagonal neighbours stay apart.
+  assert.deepEqual(penLinks(world, { x: 13, y: 13 }), {
+    sides: [false, false, false, false],
+    corners: [false, false, false, false],
+  });
 });

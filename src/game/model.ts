@@ -203,6 +203,27 @@ export function doorsOnRoad(
   });
 }
 
+// Fenced animal pens next to each other share one bigger pen.
+export const penKinds: DecorationKind[] = ["cow", "sheep", "chicken", "duck", "horses", "goats"];
+export const isPenKind = (kind: DecorationKind) => penKinds.includes(kind);
+export interface PenLinks {
+  // Pens on each side, in the order of vectors.
+  sides: boolean[];
+  // Corner k lies between sides k and k + 1; it is filled when both of
+  // those and the diagonal cell are pens, so blocks of pens have no hole.
+  corners: boolean[];
+}
+export function penLinks(world: Pick<World, "decorations">, cell: Point): PenLinks {
+  const penAt = (x: number, y: number) =>
+    world.decorations.some((d) => isPenKind(d.kind) && d.x === x && d.y === y);
+  const sides = vectors.map((v) => penAt(cell.x + v.x, cell.y + v.y));
+  const corners = vectors.map((v, k) => {
+    const w = vectors[(k + 1) % 4];
+    return sides[k] && sides[(k + 1) % 4] && penAt(cell.x + v.x + w.x, cell.y + v.y + w.y);
+  });
+  return { sides, corners };
+}
+
 export const kinds: DecorationKind[] = [
   "house",
   "houseBlue",
