@@ -155,7 +155,6 @@ function refresh(status: GameStatus) {
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });
-  $("train-tool").classList.toggle("playing", status.playing);
   $<HTMLButtonElement>("undo").disabled = !status.canUndo;
   $<HTMLButtonElement>("redo").disabled = !status.canRedo;
   $("track-count").textContent = String(status.world.tracks.length);
