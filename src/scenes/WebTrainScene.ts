@@ -317,21 +317,22 @@ export class WebTrainScene extends Phaser.Scene {
     this.scenery = this.world.decorations.map((d) => {
       const p = project(d);
       const isWater = d.kind === "water";
-      const isRoad = d.kind === "roadAsphalt" || d.kind === "roadDirt";
+      const roadKind =
+        d.kind === "roadAsphalt" || d.kind === "roadDirt" ? d.kind : null;
       const isOverlay = isTrackOverlayKind(d.kind);
       const g = this.add
         .graphics({ x: p.x, y: p.y })
         .setDepth(
-          isWater ? 0.5 : isRoad ? 0.72 : (isOverlay ? 13 : 10) + p.y,
+          isWater ? 0.5 : roadKind ? 0.72 : (isOverlay ? 13 : 10) + p.y,
         );
 
       if (isWater) {
         waterTile(g, connectedDecorationEdges(this.world, d, d.kind));
-      } else if (isRoad) {
+      } else if (roadKind) {
         roadTile(
           g,
-          d.kind,
-          connectedDecorationEdges(this.world, d, d.kind),
+          roadKind,
+          connectedDecorationEdges(this.world, d, roadKind),
         );
       } else if (isOverlay) {
         const track = this.world.tracks.find((t) => same(t, d));
@@ -570,11 +571,15 @@ export class WebTrainScene extends Phaser.Scene {
 
     if (this.tool !== "erase" && canPlace) {
       this.preview.setAlpha(0.68);
+      const roadKind =
+        this.tool === "roadAsphalt" || this.tool === "roadDirt"
+          ? this.tool
+          : null;
       if (overlay && trackAtCell) trackDecoration(this.preview, this.tool, trackAtCell);
       else if (this.tool === "water")
         waterTile(this.preview, [false, false, false, false]);
-      else if (this.tool === "roadAsphalt" || this.tool === "roadDirt")
-        roadTile(this.preview, this.tool, [false, false, false, false]);
+      else if (roadKind)
+        roadTile(this.preview, roadKind, [false, false, false, false]);
       else decoration(this.preview, this.tool);
     } else {
       this.preview.setAlpha(1);
