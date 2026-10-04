@@ -104,6 +104,15 @@ export interface World {
   closed: boolean;
   // Cells whose switch is set to the branch; others take the straight way.
   switches?: string[];
+  // The train's wagons; left out while they are the defaults.
+  train?: TrainSettings;
+}
+
+export type Cargo = "passengers" | "freight";
+export interface TrainSettings {
+  wagons?: number;
+  cargo?: Cargo;
+  name?: string;
 }
 
 export const vectors: Point[] = [
@@ -714,6 +723,61 @@ export function stationStop(
   return check(before, progress(before), 1) ?? check(after, 0, progress(after));
 }
 
+// Wagons trail the engine; how many and what they carry.
+export const MAX_WAGONS = 5;
+export const DEFAULT_WAGONS = 1;
+export const WAGON_GAP = 0.52;
+export const trainWagons = (world: World) => world.train?.wagons ?? DEFAULT_WAGONS;
+export const trainCargo = (world: World): Cargo => world.train?.cargo ?? "passengers";
+export const DEFAULT_TRAIN_NAME = "Tren";
+export const MAX_TRAIN_NAME = 32;
+const cleanTrainName = (name: string) => name.trim().replace(/\s+/g, " ").slice(0, MAX_TRAIN_NAME);
+export const trainName = (world: World) => world.train?.name ?? DEFAULT_TRAIN_NAME;
+export function setTrain(world: World, { wagons, cargo, name }: TrainSettings) {
+  const next: TrainSettings = { ...world.train };
+  if (name !== undefined) {
+    const value = cleanTrainName(name);
+    if (value && value !== DEFAULT_TRAIN_NAME) next.name = value;
+    else delete next.name;
+  }
+  if (wagons !== undefined) {
+    const value = Math.min(MAX_WAGONS, Math.max(0, Math.round(wagons)));
+    if (value === DEFAULT_WAGONS) delete next.wagons;
+    else next.wagons = value;
+  }
+  if (cargo !== undefined) {
+    if (cargo === "passengers") delete next.cargo;
+    else next.cargo = cargo;
+  }
+  if (Object.keys(next).length) world.train = next;
+  else delete world.train;
+}
+
+// Where each wagon sits behind the engine, walking back along the rail the
+// train came by; the list stops early where the rail runs out.
+export function wagonStates(
+  world: World,
+  engine: TrainState,
+  count: number,
+  prefer: Track[] = [],
+): TrainState[] {
+  const states: TrainState[] = [];
+  let at: TrainState | null = { ...engine, forward: !engine.forward };
+  for (let i = 0; i < count && at; i++) {
+    at = advanceTrain(world, at, WAGON_GAP, { stopAtEnd: true, prefer });
+    if (at) states.push(at);
+  }
+  return states;
+}
+
+// Turning the train round: the engine moves to the other end of the train
+// and faces the other way, so the wagons stay where they are.
+export function reverseTrain(world: World, engine: TrainState, count: number, prefer: Track[] = []) {
+  const wagons = wagonStates(world, engine, count, prefer);
+  const tail = wagons.length === count ? wagons.at(-1) : undefined;
+  return tail ?? { ...engine, forward: !engine.forward };
+}
+
 export function trainPose(world: World, state: TrainState) {
   const { point, tangent } = sampleTrack(world.tracks[state.track], state.t);
   const sign = state.forward ? 1 : -1;
@@ -814,6 +878,18 @@ export function parseWorld(raw: string | null): World | null {
     data.chunks = chunks;
 
     if (!validNetwork(data as World)) return null;
+    if (data.train !== undefined) {
+      const { wagons, cargo, name, ...rest } = data.train ?? {};
+      if (
+        typeof data.train !== "object" ||
+        Object.keys(rest).length ||
+        (wagons !== undefined && !(Number.isInteger(wagons) && wagons >= 0 && wagons <= MAX_WAGONS)) ||
+        (cargo !== undefined && cargo !== "passengers" && cargo !== "freight") ||
+        (name !== undefined && (typeof name !== "string" || name !== cleanTrainName(name) || !name)) ||
+        (wagons === undefined && cargo === undefined && name === undefined)
+      )
+        return null;
+    }
     const trackCells = new Map<string, number>();
     for (const t of data.tracks)
       trackCells.set(`${t.x},${t.y}`, (trackCells.get(`${t.x},${t.y}`) ?? 0) + 1);

@@ -12,6 +12,7 @@ import {
 } from "./game/saves";
 import {
   MAX_DWELL,
+  MAX_WAGONS,
   isRoadKind,
   vectors,
   type Chunk,
@@ -310,8 +311,91 @@ function placeStationView() {
 }
 window.addEventListener("resize", () => requestAnimationFrame(placeStationView));
 
+// Train panel (bottom left, in place of a station's): live view following
+// the train, its wagons and cargo, direction, and moving it to another rail.
+const trainPanel = $("train-panel");
+const trainChip = $("train-chip");
+let trainOpen = false;
+let trainTimer = 0;
+let trainCollapsed = false;
+let trainEditing = false;
+function setTrainEditing(editing: boolean) {
+  trainEditing = editing;
+  const input = $<HTMLInputElement>("train-name-input");
+  const button = $<HTMLButtonElement>("rename-train");
+  $("train-title").hidden = editing;
+  input.hidden = !editing;
+  button.innerHTML = icon(editing ? "check" : "edit");
+  button.setAttribute("aria-label", editing ? "Trenin adını kaydet" : "Trenin adını değiştir");
+  button.title = editing ? "Kaydet" : "Adını değiştir";
+  if (editing) {
+    input.value = scene.trainInfo().name;
+    requestAnimationFrame(() => {
+      input.focus();
+      input.select();
+    });
+  }
+}
+// Hiding folds the card into a small chip with the train's name.
+function setTrainCollapsed(collapsed: boolean) {
+  if (!trainOpen) return;
+  trainCollapsed = collapsed;
+  trainPanel.hidden = collapsed;
+  trainChip.hidden = !collapsed;
+  if (collapsed) {
+    setTrainEditing(false);
+    scene.setStationView(null);
+  } else {
+    renderTrain();
+    requestAnimationFrame(placeTrainView);
+  }
+}
+function renderTrain() {
+  if (!scene || !trainOpen) return;
+  const library = document.querySelector(".library")!.getBoundingClientRect();
+  scene.mapInsetRight = Math.max(0, window.innerWidth - library.left);
+  const info = scene.trainInfo();
+  if (!trainEditing) $("train-title").textContent = info.name;
+  $("train-chip-name").textContent = info.name;
+  $("follow-train").classList.toggle("active", scene.followingTrain);
+  $("follow-train").setAttribute("aria-pressed", String(scene.followingTrain));
+  trainChip.classList.toggle("following", scene.followingTrain);
+  const stationName = info.station
+    ? info.station.name || stationDefaultName(info.station.kind)
+    : "";
+  $("train-status").textContent = scene.placingTrain
+    ? "Treni koymak istediğin raya dokun."
+    : info.station
+      ? `${stationName} istasyonunda · ${info.remaining} sn`
+      : info.playing
+        ? `Yolda · ${info.speed}× hız`
+        : "Duruyor";
+  $("train-status").classList.toggle("waiting", Boolean(info.station) || scene.placingTrain);
+  $("wagons-value").textContent = String(info.wagons);
+  $<HTMLButtonElement>("wagons-minus").disabled = info.wagons <= 0;
+  $<HTMLButtonElement>("wagons-plus").disabled = info.wagons >= MAX_WAGONS;
+  for (const [id, active] of [["cargo-passengers", info.cargo === "passengers"], ["cargo-freight", info.cargo === "freight"]] as const) {
+    $(id).classList.toggle("active", active);
+    $(id).setAttribute("aria-pressed", String(active));
+  }
+  // The arrow points the way the train is heading on screen.
+  $("train-arrow").style.transform = `rotate(${(info.angle * 180) / Math.PI + 90}deg)`;
+  $("place-train").classList.toggle("active", scene.placingTrain);
+  $("place-train").setAttribute("aria-pressed", String(scene.placingTrain));
+}
+function placeTrainView() {
+  if (!scene || !trainOpen || trainCollapsed) return;
+  const rect = $("train-view").getBoundingClientRect();
+  scene.setStationView(
+    rect.width ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height } : null,
+    $<HTMLCanvasElement>("train-canvas"),
+  );
+}
+window.addEventListener("resize", () => requestAnimationFrame(placeTrainView));
+
 function refresh(status: GameStatus) {
   if (stationCell) renderStation();
+  if (trainOpen) renderTrain();
   document.querySelectorAll<HTMLElement>("[data-kind]").forEach((el) => {
     const active = el.dataset.kind === status.tool;
     el.classList.toggle("selected", active);
@@ -413,6 +497,24 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     renderStation();
     requestAnimationFrame(placeStationView);
     startStationTimer();
+  };
+  scene.onTrain = (selected) => {
+    // Tapping the train again restores a hidden card.
+    const opened = selected && (!trainOpen || trainCollapsed);
+    trainOpen = selected;
+    if (opened) trainCollapsed = false;
+    trainPanel.hidden = !selected || trainCollapsed;
+    trainChip.hidden = !selected || !trainCollapsed;
+    clearInterval(trainTimer);
+    if (!selected) {
+      trainCollapsed = false;
+      setTrainEditing(false);
+      if (scene.placingTrain) scene.setPlacingTrain(false);
+      return;
+    }
+    renderTrain();
+    if (opened) requestAnimationFrame(placeTrainView);
+    trainTimer = window.setInterval(renderTrain, 200);
   };
   scene.onMessage = toast;
   let previousRail = "";
@@ -673,6 +775,36 @@ document
   });
 bind("switch-toggle", () => scene.toggleSelectedSwitch());
 bind("close-station", () => scene.selectStation(null));
+bind("close-train", () => scene.selectTrain(false));
+bind("hide-train", () => setTrainCollapsed(true));
+bind("train-chip", () => setTrainCollapsed(false));
+bind("follow-train", () => scene.setFollowingTrain(!scene.followingTrain));
+bind("rename-train", () => {
+  if (!trainEditing) {
+    setTrainEditing(true);
+    return;
+  }
+  scene.setTrainSettings({ name: $<HTMLInputElement>("train-name-input").value });
+  setTrainEditing(false);
+  renderTrain();
+});
+$<HTMLInputElement>("train-name-input").addEventListener("keydown", (event) => {
+  if (event.key === "Enter") {
+    event.preventDefault();
+    $<HTMLButtonElement>("rename-train").click();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    setTrainEditing(false);
+  }
+});
+const stepWagons = (by: number) =>
+  scene.setTrainSettings({ wagons: scene.trainInfo().wagons + by });
+bind("wagons-minus", () => stepWagons(-1));
+bind("wagons-plus", () => stepWagons(1));
+bind("cargo-passengers", () => scene.setTrainSettings({ cargo: "passengers" }));
+bind("cargo-freight", () => scene.setTrainSettings({ cargo: "freight" }));
+bind("reverse-train", () => scene.reverseTrain());
+bind("place-train", () => scene.setPlacingTrain(!scene.placingTrain));
 bind("hide-station", () => setStationCollapsed(true));
 bind("station-chip", () => setStationCollapsed(false));
 bind("rename-station", () => {
@@ -895,7 +1027,9 @@ window.addEventListener("keydown", (e) => {
       /INPUT|SELECT|TEXTAREA/.test(e.target.tagName))
   )
     return;
-  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
+  if (e.key === "Escape" && scene.placingTrain) {
+    scene.setPlacingTrain(false);
+  } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "z") {
     e.preventDefault();
     e.shiftKey ? scene.redo() : scene.undo();
   } else if (e.code === "Space") {

@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  trainName,
+  reverseTrain,
+  setTrain,
+  wagonStates,
   bufferSide,
   crossingAt,
   isBridge,
@@ -463,4 +467,53 @@ test("rails laid over water become a bridge", () => {
   assert.ok(placeDecoration(world, { x: 9, y: 8 }, "water"));
   assert.equal(placeDecoration(world, { x: 10, y: 8 }, "house"), false);
   assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+});
+
+test("train settings: wagons and cargo, saved only when changed", () => {
+  const world = line();
+  setTrain(world, { wagons: 3, cargo: "freight" });
+  assert.deepEqual(world.train, { wagons: 3, cargo: "freight" });
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  setTrain(world, { wagons: 9 });
+  assert.equal(world.train?.wagons, 5);
+  setTrain(world, { wagons: 1, cargo: "passengers" });
+  assert.equal(world.train, undefined);
+  for (const train of [{ wagons: 6 }, { wagons: 1.5 }, { cargo: "cows" }, {}, { wagons: 2, colour: "red" }])
+    assert.equal(parseWorld(JSON.stringify({ ...line(), train })), null);
+});
+
+test("wagons line up behind the engine and the train turns round in place", () => {
+  const world = line();
+  appendTrack(world, 0);
+  appendTrack(world, 0);
+  // Engine near the far end, heading on.
+  const engine = { track: 4, forward: true, t: 0.5 };
+  const wagons = wagonStates(world, engine, 3);
+  assert.equal(wagons.length, 3);
+  assert.deepEqual(
+    wagons.map((w) => [w.track, Math.round(w.t * 100) / 100]),
+    [[3, 0.98], [3, 0.46], [2, 0.94]],
+  );
+  // Too close to the start for all of them: the list stops where rail ends.
+  assert.equal(wagonStates(world, { track: 0, forward: true, t: 0.6 }, 3).length, 1);
+  // Reversing puts the engine where the last wagon was, facing back.
+  const turned = reverseTrain(world, engine, 3);
+  assert.deepEqual(turned, wagons[2]);
+  assert.equal(turned.forward, false);
+  // With no room for the wagons it simply turns in place.
+  assert.deepEqual(reverseTrain(world, { track: 0, forward: true, t: 0.6 }, 3), { track: 0, forward: false, t: 0.6 });
+});
+
+test("trains can be named; the default name is not saved", () => {
+  const world = line();
+  assert.equal(trainName(world), "Tren");
+  setTrain(world, { name: "  Doğu   Ekspresi " });
+  assert.equal(trainName(world), "Doğu Ekspresi");
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  setTrain(world, { name: "" });
+  assert.equal(world.train, undefined);
+  setTrain(world, { name: "Tren" });
+  assert.equal(world.train, undefined);
+  for (const name of ["", "  boşluklu ", 7, "x".repeat(40)])
+    assert.equal(parseWorld(JSON.stringify({ ...line(), train: { name } })), null);
 });
