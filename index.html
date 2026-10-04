@@ -272,170 +272,177 @@
         <span>·</span> Kaydır, yakınlaş
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
-      <section
-        id="station-panel"
-        class="station-panel"
-        aria-labelledby="station-title"
-        hidden
-      >
-        <header class="station-header">
-          <div class="station-title-area">
-            <h2 id="station-title">İstasyon</h2>
-            <input
-              id="station-name-input"
-              class="station-name-input"
-              type="text"
-              maxlength="32"
-              aria-label="İstasyon adı"
-              hidden
-            />
-          </div>
-          <div class="station-header-actions">
-            <button
-              id="rename-station"
-              class="icon-button"
-              aria-label="İstasyon adını değiştir"
-              title="İstasyon adını değiştir"
-              data-icon="edit"
-            ></button>
-            <button
-              id="hide-station"
-              class="icon-button"
-              aria-label="İstasyon kutusunu gizle"
-              title="Gizle"
-              data-icon="eyeOff"
-            ></button>
-            <button
-              id="close-station"
-              class="icon-button"
-              aria-label="İstasyon penceresini kapat"
-              title="Kapat"
-              data-icon="close"
-            ></button>
-          </div>
-        </header>
-        <div class="station-body">
-          <div
-            id="station-view"
-            class="station-view"
-            role="img"
-            aria-label="İstasyonun canlı görüntüsü"
+      <!-- Station and train cards stack bottom left; the newest goes on top. -->
+      <div id="info-stack" class="info-stack">
+        <div id="train-slot" class="info-slot">
+          <section
+            id="train-panel"
+            class="station-panel train-panel"
+            aria-labelledby="train-title"
+            hidden
           >
-            <canvas id="station-canvas"></canvas>
-          </div>
-          <div class="station-lights" role="group" aria-label="İstasyon durumu">
-            <button id="station-open" class="station-light open" title="İstasyonu aç" aria-label="İstasyonu aç"></button>
-            <button id="station-closed" class="station-light closed" title="İstasyonu kapat" aria-label="İstasyonu kapat"></button>
-          </div>
-        </div>
-        <div id="station-dwell-row" class="station-row">
-          <p id="station-status" class="station-status" aria-live="polite"></p>
-          <div class="stepper" aria-label="Bekleme süresi">
-            <button id="dwell-minus" aria-label="Bekleme süresini azalt">−</button
-            ><output id="dwell-value" class="station-dwell-value">3 sn</output
-            ><button id="dwell-plus" aria-label="Bekleme süresini artır">+</button>
-          </div>
-        </div>
-      </section>
-      <button
-        id="station-chip"
-        class="station-chip"
-        type="button"
-        aria-label="Gizli istasyon kutusunu aç"
-        hidden
-      >
-        <span id="station-chip-name">İstasyon</span>
-      </button>
-      <section
-        id="train-panel"
-        class="station-panel train-panel"
-        aria-labelledby="train-title"
-        hidden
-      >
-        <header class="station-header">
-          <div class="station-title-area">
-            <h2 id="train-title">Tren</h2>
-            <input
-              id="train-name-input"
-              class="station-name-input"
-              type="text"
-              maxlength="32"
-              aria-label="Tren adı"
-              hidden
-            />
-          </div>
-          <div class="station-header-actions">
-            <button
-              id="rename-train"
-              class="icon-button"
-              aria-label="Trenin adını değiştir"
-              title="Adını değiştir"
-              data-icon="edit"
-            ></button>
-            <button
-              id="hide-train"
-              class="icon-button"
-              aria-label="Tren kutusunu gizle"
-              title="Gizle"
-              data-icon="eyeOff"
-            ></button>
-            <button
-              id="close-train"
-              class="icon-button"
-              aria-label="Tren penceresini kapat"
-              title="Kapat"
-              data-icon="close"
-            ></button>
-          </div>
-        </header>
-        <div
-          id="train-view"
-          class="station-view train-view"
-          role="img"
-          aria-label="Trenin canlı görüntüsü"
-        >
-          <canvas id="train-canvas"></canvas>
-        </div>
-        <p id="train-status" class="train-status" aria-live="polite"></p>
-        <div class="station-row train-row">
-          <span>Vagon</span>
-          <div class="stepper" aria-label="Vagon sayısı">
-            <button id="wagons-minus" aria-label="Vagon çıkar">−</button
-            ><output id="wagons-value" class="wagons-value">1</output
-            ><button id="wagons-plus" aria-label="Vagon ekle">+</button>
-          </div>
-        </div>
-        <div class="station-row train-row">
-          <span>Taşıdığı</span>
-          <div class="segmented" role="group" aria-label="Taşıdığı">
-            <button id="cargo-passengers" aria-pressed="true">Yolcu</button
-            ><button id="cargo-freight" aria-pressed="false">Yük</button>
-          </div>
-        </div>
-        <div class="train-actions">
-          <button id="reverse-train" title="Trenin yönünü değiştir">
-            <span id="train-arrow" class="train-arrow" data-icon="forward"></span>
-            Çevir
-          </button>
-          <button id="place-train" title="Treni başka bir raya taşı" aria-pressed="false">
-            <span data-icon="pointer"></span>
-            Taşı
-          </button>
-          <button id="follow-train" title="Kamera treni takip etsin" aria-pressed="false">
-            <span data-icon="focus"></span>
-            Takip
+            <header class="station-header">
+              <div class="station-title-area">
+                <h2 id="train-title">Tren</h2>
+                <input
+                  id="train-name-input"
+                  class="station-name-input"
+                  type="text"
+                  maxlength="32"
+                  aria-label="Tren adı"
+                  hidden
+                />
+              </div>
+              <div class="station-header-actions">
+                <button
+                  id="rename-train"
+                  class="icon-button"
+                  aria-label="Trenin adını değiştir"
+                  title="Adını değiştir"
+                  data-icon="edit"
+                ></button>
+                <button
+                  id="hide-train"
+                  class="icon-button"
+                  aria-label="Tren kutusunu gizle"
+                  title="Gizle"
+                  data-icon="eyeOff"
+                ></button>
+                <button
+                  id="close-train"
+                  class="icon-button"
+                  aria-label="Tren penceresini kapat"
+                  title="Kapat"
+                  data-icon="close"
+                ></button>
+              </div>
+            </header>
+            <div
+              id="train-view"
+              class="station-view train-view"
+              role="img"
+              aria-label="Trenin canlı görüntüsü"
+            >
+              <canvas id="train-canvas"></canvas>
+            </div>
+            <p id="train-status" class="train-status" aria-live="polite"></p>
+            <div class="station-row train-row">
+              <span>Vagon</span>
+              <div class="stepper" aria-label="Vagon sayısı">
+                <button id="wagons-minus" aria-label="Vagon çıkar">−</button
+                ><output id="wagons-value" class="wagons-value">1</output
+                ><button id="wagons-plus" aria-label="Vagon ekle">+</button>
+              </div>
+            </div>
+            <div class="station-row train-row">
+              <span>Taşıdığı</span>
+              <div class="segmented" role="group" aria-label="Taşıdığı">
+                <button id="cargo-passengers" aria-pressed="true">Yolcu</button
+                ><button id="cargo-freight" aria-pressed="false">Yük</button>
+              </div>
+            </div>
+            <div class="train-actions">
+              <button id="reverse-train" title="Trenin yönünü değiştir">
+                <span id="train-arrow" class="train-arrow" data-icon="forward"></span>
+                Çevir
+              </button>
+              <button id="place-train" title="Treni başka bir raya taşı" aria-pressed="false">
+                <span data-icon="pointer"></span>
+                Taşı
+              </button>
+              <button id="follow-train" title="Kamera treni takip etsin" aria-pressed="false">
+                <span data-icon="focus"></span>
+                Takip
+              </button>
+            </div>
+          </section>
+          <button
+            id="train-chip"
+            class="station-chip"
+            type="button"
+            aria-label="Gizli tren kutusunu aç"
+            hidden
+          >
+            <span id="train-chip-name">Tren</span>
           </button>
         </div>
-      </section>
-      <button
-        id="train-chip"
-        class="station-chip"
-        type="button"
-        aria-label="Gizli tren kutusunu aç"
-        hidden
-      >
-        <span id="train-chip-name">Tren</span>
-      </button>
+        <div id="station-slot" class="info-slot">
+          <section
+            id="station-panel"
+            class="station-panel"
+            aria-labelledby="station-title"
+            hidden
+          >
+            <header class="station-header">
+              <div class="station-title-area">
+                <h2 id="station-title">İstasyon</h2>
+                <input
+                  id="station-name-input"
+                  class="station-name-input"
+                  type="text"
+                  maxlength="32"
+                  aria-label="İstasyon adı"
+                  hidden
+                />
+              </div>
+              <div class="station-header-actions">
+                <button
+                  id="rename-station"
+                  class="icon-button"
+                  aria-label="İstasyon adını değiştir"
+                  title="İstasyon adını değiştir"
+                  data-icon="edit"
+                ></button>
+                <button
+                  id="hide-station"
+                  class="icon-button"
+                  aria-label="İstasyon kutusunu gizle"
+                  title="Gizle"
+                  data-icon="eyeOff"
+                ></button>
+                <button
+                  id="close-station"
+                  class="icon-button"
+                  aria-label="İstasyon penceresini kapat"
+                  title="Kapat"
+                  data-icon="close"
+                ></button>
+              </div>
+            </header>
+            <div class="station-body">
+              <div
+                id="station-view"
+                class="station-view"
+                role="img"
+                aria-label="İstasyonun canlı görüntüsü"
+              >
+                <canvas id="station-canvas"></canvas>
+              </div>
+              <div class="station-lights" role="group" aria-label="İstasyon durumu">
+                <button id="station-open" class="station-light open" title="İstasyonu aç" aria-label="İstasyonu aç"></button>
+                <button id="station-closed" class="station-light closed" title="İstasyonu kapat" aria-label="İstasyonu kapat"></button>
+              </div>
+            </div>
+            <div id="station-dwell-row" class="station-row">
+              <p id="station-status" class="station-status" aria-live="polite"></p>
+              <div class="stepper" aria-label="Bekleme süresi">
+                <button id="dwell-minus" aria-label="Bekleme süresini azalt">−</button
+                ><output id="dwell-value" class="station-dwell-value">3 sn</output
+                ><button id="dwell-plus" aria-label="Bekleme süresini artır">+</button>
+              </div>
+            </div>
+          </section>
+          <button
+            id="station-chip"
+            class="station-chip"
+            type="button"
+            aria-label="Gizli istasyon kutusunu aç"
+            hidden
+          >
+            <span id="station-chip-name">İstasyon</span>
+          </button>
+        </div>
+      </div>
       <dialog id="help-dialog">
         <button
           class="dialog-close icon-button"

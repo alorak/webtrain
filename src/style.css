@@ -3632,3 +3632,42 @@ button.game-logo:focus-visible {
   background: #2c9c64;
   vertical-align: 1px;
 }
+
+
+/* Bottom-left stack of info cards: the newest card or chip sits on top of
+   the others instead of covering them. */
+.info-stack {
+  position: fixed;
+  z-index: 30;
+  left: 12px;
+  bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  max-height: calc(100vh - 92px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+}
+.info-stack::-webkit-scrollbar {
+  display: none;
+}
+.info-slot {
+  display: contents;
+}
+.info-stack .station-panel,
+.info-stack .station-chip {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  flex: 0 0 auto;
+  pointer-events: auto;
+}
+@media (max-width: 759px) {
+  .info-stack {
+    left: 8px;
+    bottom: 8px;
+    max-height: calc(100vh - 76px);
+  }
+}

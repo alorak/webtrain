@@ -267,10 +267,11 @@ function setStationCollapsed(collapsed: boolean) {
     clearInterval(stationTimer);
     scene?.setStationView(null);
     $("station-chip-name").textContent = stationDisplayName();
+    restack();
   } else {
     stationChip.hidden = true;
     renderStation();
-    requestAnimationFrame(placeStationView);
+    raiseCard("station-slot");
     startStationTimer();
   }
 }
@@ -297,6 +298,21 @@ function renderStation() {
       : `Trenler ${info.dwell} sn bekler`;
   $("station-status").classList.toggle("waiting", info.waiting);
 }
+
+// Station and train cards share a bottom-left stack. A card that opens
+// goes on top; the views are re-measured whenever the stack shifts.
+const infoStack = $("info-stack");
+function raiseCard(slot: string) {
+  infoStack.prepend($(slot));
+  restack();
+}
+function restack() {
+  requestAnimationFrame(() => {
+    placeStationView();
+    placeTrainView();
+  });
+}
+infoStack.addEventListener("scroll", restack);
 
 function placeStationView() {
   if (!scene || !stationCell || stationCollapsed || stationPanel.hidden) {
@@ -344,10 +360,11 @@ function setTrainCollapsed(collapsed: boolean) {
   trainChip.hidden = !collapsed;
   if (collapsed) {
     setTrainEditing(false);
-    scene.setStationView(null);
+    scene.setTrainView(null);
+    restack();
   } else {
     renderTrain();
-    requestAnimationFrame(placeTrainView);
+    raiseCard("train-slot");
   }
 }
 function renderTrain() {
@@ -386,7 +403,7 @@ function renderTrain() {
 function placeTrainView() {
   if (!scene || !trainOpen || trainCollapsed) return;
   const rect = $("train-view").getBoundingClientRect();
-  scene.setStationView(
+  scene.setTrainView(
     rect.width ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height } : null,
     $<HTMLCanvasElement>("train-canvas"),
   );
@@ -485,6 +502,7 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
       stationPanel.hidden = true;
       stationChip.hidden = true;
       scene.setStationView(null);
+      restack();
       return;
     }
 
@@ -495,7 +513,7 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     stationChip.hidden = true;
     if (!sameCell(previous, cell)) scene.setStationView(null);
     renderStation();
-    requestAnimationFrame(placeStationView);
+    raiseCard("station-slot");
     startStationTimer();
   };
   scene.onTrain = (selected) => {
@@ -510,10 +528,11 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
       trainCollapsed = false;
       setTrainEditing(false);
       if (scene.placingTrain) scene.setPlacingTrain(false);
+      restack();
       return;
     }
     renderTrain();
-    if (opened) requestAnimationFrame(placeTrainView);
+    if (opened) raiseCard("train-slot");
     trainTimer = window.setInterval(renderTrain, 200);
   };
   scene.onMessage = toast;

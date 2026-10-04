@@ -108,6 +108,9 @@ export interface RailControls {
   toggle: { x: number; y: number; thrown: boolean } | null;
 }
 
+type InfoView = "station" | "train";
+type ViewRect = { x: number; y: number; width: number; height: number };
+
 export interface GameStatus {
   world: World;
   tool: Tool;
@@ -168,10 +171,11 @@ export class WebTrainScene extends Phaser.Scene {
   private dwellCell: Point | null = null;
   private dwellUntil = 0;
   private selectedStation: Point | null = null;
-  // A second camera draws the selected station on the game canvas, under
-  // the info panel; after each frame that area is copied into the panel.
-  private stationCamera: Phaser.Cameras.Scene2D.Camera | null = null;
-  private stationCanvas: HTMLCanvasElement | null = null;
+  // Each info card (station, train) has its own camera drawing on the game
+  // canvas under the card; after each frame that area is copied into it.
+  private views: Partial<
+    Record<InfoView, { camera: Phaser.Cameras.Scene2D.Camera; canvas: HTMLCanvasElement }>
+  > = {};
   private speed = 1;
   onChange?: (status: GameStatus) => void;
   onMessage?: (message: string) => void;
@@ -206,7 +210,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.events.once("shutdown", () =>
       this.scale.off("resize", this.resize, this),
     );
-    this.game.events.on("postrender", this.copyStationView, this);
+    this.game.events.on("postrender", this.copyViews, this);
     this.game.events.emit("world-ready", this);
   }
   private resize() {
@@ -547,21 +551,22 @@ export class WebTrainScene extends Phaser.Scene {
       .lineBetween(first.x - 7, first.y - 14, first.x + 7, first.y - 7);
   }
   // Keeps the train on the same piece across edits, or restarts it.
-  private copyStationView() {
-    const camera = this.stationCamera;
-    const target = this.stationCanvas;
-    if (!camera || !target) return;
+  private copyViews() {
     const source = this.game.canvas;
     const ratio = source.width / (source.clientWidth || source.width);
-    const width = Math.round(camera.width * ratio);
-    const height = Math.round(camera.height * ratio);
-    if (target.width !== width || target.height !== height) {
-      target.width = width;
-      target.height = height;
+    for (const view of Object.values(this.views)) {
+      if (!view) continue;
+      const { camera, canvas } = view;
+      const width = Math.round(camera.width * ratio);
+      const height = Math.round(camera.height * ratio);
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
+      canvas
+        .getContext("2d")
+        ?.drawImage(source, camera.x * ratio, camera.y * ratio, width, height, 0, 0, width, height);
     }
-    target
-      .getContext("2d")
-      ?.drawImage(source, camera.x * ratio, camera.y * ratio, width, height, 0, 0, width, height);
   }
   // Lowers the barriers while the train is close, and flashes the lights.
   private animateCrossings(time: number, delta: number, train: Point[]) {
@@ -608,16 +613,13 @@ export class WebTrainScene extends Phaser.Scene {
     };
   }
   selectStation(cell: Point | null) {
-    // One info panel at a time: a station replaces the train's.
-    if (cell && this.trainSelected) this.selectTrain(false);
     this.selectedStation = cell ? { x: cell.x, y: cell.y } : null;
     if (!cell) this.setStationView(null);
     this.onStation?.(this.selectedStation);
   }
   selectTrain(selected: boolean) {
-    if (selected && this.selectedStation) this.selectStation(null);
     if (!selected) {
-      this.setStationView(null);
+      this.setTrainView(null);
       this.followingTrain = false;
     }
     this.trainSelected = selected;
@@ -691,29 +693,36 @@ export class WebTrainScene extends Phaser.Scene {
   }
   // Shows the selected station in the panel's canvas, which sits over the
   // given screen rectangle.
-  setStationView(
-    rect: { x: number; y: number; width: number; height: number } | null,
-    canvas: HTMLCanvasElement | null = null,
-  ) {
-    if (!rect || (!this.selectedStation && !this.trainSelected)) {
-      if (this.stationCamera) this.cameras.remove(this.stationCamera);
-      this.stationCamera = null;
-      this.stationCanvas = null;
+  // Shows the selected station, or the train, in a card's canvas that sits
+  // over the given screen rectangle; null removes that view.
+  setStationView(rect: ViewRect | null, canvas: HTMLCanvasElement | null = null) {
+    this.setView("station", rect, canvas);
+  }
+  setTrainView(rect: ViewRect | null, canvas: HTMLCanvasElement | null = null) {
+    this.setView("train", rect, canvas);
+  }
+  private setView(kind: InfoView, rect: ViewRect | null, canvas: HTMLCanvasElement | null) {
+    const target =
+      kind === "station"
+        ? this.selectedStation && project(this.selectedStation)
+        : this.trainSelected && project(trainPose(this.world, this.trainState).point);
+    const view = this.views[kind];
+    if (!rect || !canvas || !target) {
+      if (view) this.cameras.remove(view.camera);
+      delete this.views[kind];
       return;
     }
-    this.stationCanvas = canvas;
-    if (!this.stationCamera) {
-      this.stationCamera = this.cameras.add(rect.x, rect.y, rect.width, rect.height);
-      this.stationCamera.setBackgroundColor(0xa7c882).ignore(this.preview);
-    }
-    const p = this.selectedStation
-      ? project(this.selectedStation)
-      : project(trainPose(this.world, this.trainState).point);
-    this.stationCamera
+    const camera =
+      view?.camera ??
+      this.cameras.add(rect.x, rect.y, rect.width, rect.height).setBackgroundColor(0xa7c882);
+    camera.ignore(this.preview);
+    this.views[kind] = { camera, canvas };
+    camera
       .setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height))
       .setZoom(1.6)
-      .centerOn(p.x, p.y - 18);
+      .centerOn(target.x, target.y - 18);
   }
+
   private syncTrain() {
     const t = this.trainTrack;
     const index = t
@@ -838,9 +847,10 @@ export class WebTrainScene extends Phaser.Scene {
         middle.y + (target.y - 16 - middle.y) * 0.15,
       );
     }
-    if (this.trainSelected && this.stationCamera) {
+    const trainView = this.views.train;
+    if (this.trainSelected && trainView) {
       const p = project(pose.point);
-      this.stationCamera.centerOn(p.x, p.y - 16);
+      trainView.camera.centerOn(p.x, p.y - 16);
     }
     this.animateCrossings(time, delta, near);
     const camera = this.cameras.main;
