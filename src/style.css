@@ -2922,3 +2922,102 @@ button.game-logo:focus-visible {
     bottom: auto;
   }
 }
+
+
+/* Unified two-row map controls */
+.history-tools.map-controls {
+  top: 16px;
+  left: 16px;
+  right: auto;
+  bottom: auto;
+  width: auto;
+  min-width: 150px;
+  padding: 8px 10px 9px;
+  border-radius: 20px;
+  display: grid;
+  gap: 7px;
+  background: rgb(255 253 245 / 94%);
+  border: 1px solid rgb(255 255 255 / 78%);
+  box-shadow: 0 8px 24px rgb(49 79 43 / 16%);
+  backdrop-filter: blur(9px);
+}
+
+.map-control-row {
+  display: grid;
+  align-items: center;
+}
+
+.map-control-row--top,
+.map-control-row--zoom {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.map-control-row .icon-button {
+  width: 40px;
+  height: 38px;
+  border-radius: 12px;
+}
+
+.map-control-row svg {
+  width: 20px;
+  height: 20px;
+}
+
+.map-control-row--top .icon-button {
+  color: #6b7c70;
+}
+
+.map-control-row--zoom {
+  min-height: 38px;
+}
+
+.map-control-row--zoom #zoom-label {
+  display: grid;
+  place-items: center;
+  min-width: 46px;
+  padding: 0 4px;
+  font-size: 11px;
+  font-weight: 800;
+  color: #6f7d66;
+  font-variant-numeric: tabular-nums;
+}
+
+.map-control-divider {
+  display: block;
+  height: 1px;
+  background: #dfe5d3;
+  margin: 0 2px;
+}
+
+@media (max-width: 759px) {
+  .history-tools.map-controls {
+    top: 10px;
+    left: 10px;
+    min-width: 138px;
+    padding: 7px 8px 8px;
+    border-radius: 18px;
+    gap: 6px;
+  }
+
+  .map-control-row .icon-button {
+    width: 37px;
+    height: 35px;
+    border-radius: 11px;
+  }
+
+  .map-control-row svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  .map-control-row--zoom #zoom-label {
+    min-width: 42px;
+    font-size: 10px;
+  }
+}
+
+@media (max-height: 550px) and (min-width: 760px) {
+  .history-tools.map-controls {
+    top: 12px;
+  }
+}
