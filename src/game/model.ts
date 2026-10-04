@@ -2,21 +2,47 @@ export const SIZE = 24;
 export const STORAGE_KEY = "webtrain-world-v1";
 export type Heading = 0 | 1 | 2 | 3;
 export type Turn = -1 | 0 | 1;
+
 export type DecorationKind =
   | "house"
+  | "houseBlue"
+  | "houseRed"
+  | "cottage"
+  | "farmhouse"
   | "pine"
   | "tree"
+  | "treeSmall"
+  | "blossom"
+  | "flowers"
   | "duck"
   | "cow"
   | "sheep"
+  | "chicken"
   | "pond"
+  | "water"
   | "mountain"
+  | "mountainSnow"
   | "windmill"
   | "balloon"
   | "ferris"
   | "waterfall"
-  | "tent";
+  | "fountain"
+  | "tent"
+  | "carousel"
+  | "cake"
+  | "circus"
+  | "icecream"
+  | "funhouse"
+  | "gift"
+  | "playground"
+  | "stationSmall"
+  | "stationLarge"
+  | "stationCountry"
+  | "tunnelStone"
+  | "tunnelGreen";
+
 export type Tool = "select" | "track" | "erase" | DecorationKind;
+
 export interface Point {
   x: number;
   y: number;
@@ -34,27 +60,64 @@ export interface World {
   decorations: Decoration[];
   closed: boolean;
 }
+
 export const vectors: Point[] = [
   { x: 1, y: 0 },
   { x: 0, y: 1 },
   { x: -1, y: 0 },
   { x: 0, y: -1 },
 ];
+
 export const kinds: DecorationKind[] = [
   "house",
+  "houseBlue",
+  "houseRed",
+  "cottage",
+  "farmhouse",
   "pine",
   "tree",
+  "treeSmall",
+  "blossom",
+  "flowers",
   "duck",
   "cow",
   "sheep",
+  "chicken",
   "pond",
+  "water",
   "mountain",
+  "mountainSnow",
   "windmill",
   "balloon",
   "ferris",
   "waterfall",
+  "fountain",
   "tent",
+  "carousel",
+  "cake",
+  "circus",
+  "icecream",
+  "funhouse",
+  "gift",
+  "playground",
+  "stationSmall",
+  "stationLarge",
+  "stationCountry",
+  "tunnelStone",
+  "tunnelGreen",
 ];
+
+export const trackOverlayKinds: DecorationKind[] = [
+  "stationSmall",
+  "stationLarge",
+  "stationCountry",
+  "tunnelStone",
+  "tunnelGreen",
+];
+
+export const isTrackOverlayKind = (kind: DecorationKind) =>
+  trackOverlayKinds.includes(kind);
+
 export const same = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
 export const inside = (p: Point) =>
   Number.isInteger(p.x) &&
@@ -63,17 +126,20 @@ export const inside = (p: Point) =>
   p.y >= 0 &&
   p.x < SIZE &&
   p.y < SIZE;
+
 export const nextCell = (track: Track): Point => ({
   x: track.x + vectors[track.exit].x,
   y: track.y + vectors[track.exit].y,
 });
+
 export function candidate(world: World, turn: Turn): Track | null {
   if (world.closed || !world.tracks.length) return null;
   const last = world.tracks.at(-1)!;
   const cell = nextCell(last);
   if (
     !inside(cell) ||
-    [...world.tracks, ...world.decorations].some((p) => same(p, cell))
+    world.tracks.some((p) => same(p, cell)) ||
+    world.decorations.some((p) => same(p, cell))
   )
     return null;
   return {
@@ -82,6 +148,7 @@ export function candidate(world: World, turn: Turn): Track | null {
     exit: ((last.exit + turn + 4) % 4) as Heading,
   };
 }
+
 export function appendTrack(world: World, turn: Turn): boolean {
   const track = candidate(world, turn);
   if (!track) return false;
@@ -90,19 +157,26 @@ export function appendTrack(world: World, turn: Turn): boolean {
   world.closed = same(nextCell(track), first) && track.exit === first.entry;
   return true;
 }
+
 export function placeDecoration(
   world: World,
   cell: Point,
   kind: DecorationKind,
 ): boolean {
-  if (
-    !inside(cell) ||
-    [...world.tracks, ...world.decorations].some((p) => same(p, cell))
-  )
+  if (!inside(cell) || world.decorations.some((p) => same(p, cell)))
     return false;
+
+  const hasTrack = world.tracks.some((p) => same(p, cell));
+  if (isTrackOverlayKind(kind)) {
+    if (!hasTrack) return false;
+  } else if (hasTrack) {
+    return false;
+  }
+
   world.decorations.push({ ...cell, kind });
   return true;
 }
+
 export function createWorld(): World {
   const world: World = {
     version: 1,
@@ -132,6 +206,7 @@ export function createWorld(): World {
   ];
   return world;
 }
+
 // Defensive loading: localStorage can contain old, partial or manually edited data.
 export function parseWorld(raw: string | null): World | null {
   if (!raw) return null;
@@ -143,14 +218,28 @@ export function parseWorld(raw: string | null): World | null {
       !Array.isArray(data.decorations) ||
       typeof data.closed !== "boolean" ||
       data.tracks.length < 1 ||
-      data.tracks.length + data.decorations.length > SIZE * SIZE
+      data.tracks.length + data.decorations.length > SIZE * SIZE * 2
     )
       return null;
-    const occupied = new Set<string>();
-    for (const p of [...data.tracks, ...data.decorations]) {
-      if (!p || !inside(p) || occupied.has(`${p.x},${p.y}`)) return null;
-      occupied.add(`${p.x},${p.y}`);
+
+    const trackCells = new Set<string>();
+    for (const t of data.tracks) {
+      if (!t || !inside(t)) return null;
+      const key = `${t.x},${t.y}`;
+      if (trackCells.has(key)) return null;
+      trackCells.add(key);
     }
+
+    const decorationCells = new Set<string>();
+    for (const d of data.decorations) {
+      if (!d || !inside(d) || !kinds.includes(d.kind)) return null;
+      const key = `${d.x},${d.y}`;
+      if (decorationCells.has(key)) return null;
+      decorationCells.add(key);
+      const hasTrack = trackCells.has(key);
+      if (isTrackOverlayKind(d.kind) ? !hasTrack : hasTrack) return null;
+    }
+
     for (let i = 0; i < data.tracks.length; i++) {
       const t = data.tracks[i];
       if (
@@ -166,21 +255,23 @@ export function parseWorld(raw: string | null): World | null {
       )
         return null;
     }
-    if (data.decorations.some((d: Decoration) => !kinds.includes(d.kind)))
-      return null;
+
     const last = data.tracks.at(-1);
     const first = data.tracks[0];
     if (
       data.closed !== (same(nextCell(last), first) && last.exit === first.entry)
     )
       return null;
+
     return data as World;
   } catch {
     return null;
   }
 }
+
 export const trackLength = (track: Track) =>
   track.entry === track.exit ? 1 : Math.PI / 4;
+
 // Both drawing and train movement use the same true quarter-circle geometry.
 export function sampleTrack(
   track: Track,
@@ -205,6 +296,7 @@ export function sampleTrack(
     tangent: { x: -Math.sin(angle) * sign, y: Math.cos(angle) * sign },
   };
 }
+
 export function sampleRoute(tracks: Track[], distance: number) {
   let remaining = Math.max(0, distance);
   for (const track of tracks) {
