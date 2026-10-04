@@ -15,6 +15,7 @@ import {
   inside,
   isGrassKind,
   isGroundLayer,
+  isPenKind,
   isSwitch,
   isRoadKind,
   isTileKind,
@@ -23,6 +24,7 @@ import {
   neighboringChunk,
   openEnds,
   parseWorld,
+  penLinks,
   piecesAt,
   placeDecoration,
   removableTrack,
@@ -438,7 +440,10 @@ export class WebTrainScene extends Phaser.Scene {
             if (i > 0) extra.push(target);
           });
       } else {
-        decoration(g, d.kind, roadAtEntrance(this.world, d));
+        decoration(g, d.kind, {
+          road: roadAtEntrance(this.world, d),
+          pen: isPenKind(d.kind) ? penLinks(this.world, d) : undefined,
+        });
       }
       return g;
     });

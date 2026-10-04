@@ -10,6 +10,7 @@ import {
   vectors,
   type DecorationKind,
   type Entrance,
+  type PenLinks,
   type Point,
   type GrassKind,
   type RoadKind,
@@ -438,11 +439,48 @@ function horse(g: G, x: number, y: number, color: number) {
 }
 
 // Fenced animal pens share one footprint; the far fence is drawn behind the animals.
-function pen(g: G, ground: number, inside: () => void) {
-  pad(g, -0.3, 0.3, -0.3, 0.3, ground);
-  fence(g, [[-0.3, 0.3], [-0.3, -0.3], [0.3, -0.3]]);
+const alone: PenLinks = { sides: [false, false, false, false], corners: [false, false, false, false] };
+// A pen is a fenced square in the middle of its tile. Next to another pen it
+// reaches to the shared edge with no fence between them, like the roads, and
+// its outer fences line up with the neighbour's. Far fences are drawn behind
+// the animals, near ones in front.
+function pen(g: G, ground: number, inside: () => void, { sides, corners }: PenLinks = alone) {
+  const h = 0.3;
+  const rects: Rect[] = [[-h, h, -h, h]];
+  const fences: Segment[] = [];
+  vectors.forEach((v, k) => {
+    const at = (a: number, n: number): [number, number] => (v.x ? [n * v.x, a] : [a, n * v.y]);
+    if (!sides[k]) {
+      fences.push([...at(-h, h), ...at(h, h)]);
+      return;
+    }
+    const [x0, y0] = at(-h, h);
+    const [x1, y1] = at(h, 0.5);
+    rects.push([Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)]);
+    // Each side of the arm, unless a filled corner continues the pen there.
+    for (const a of [-h, h]) {
+      const lateral = v.x ? { x: 0, y: Math.sign(a) } : { x: Math.sign(a), y: 0 };
+      const j = vectors.findIndex((w) => w.x === lateral.x && w.y === lateral.y);
+      const filled = j === (k + 1) % 4 ? corners[k] : corners[j];
+      if (!filled) fences.push([...at(a, h), ...at(a, 0.5)]);
+    }
+  });
+  corners.forEach((filled, k) => {
+    if (!filled) return;
+    const q = { x: vectors[k].x + vectors[(k + 1) % 4].x, y: vectors[k].y + vectors[(k + 1) % 4].y };
+    rects.push([q.x > 0 ? h : -0.5, q.x > 0 ? 0.5 : -h, q.y > 0 ? h : -0.5, q.y > 0 ? 0.5 : -h]);
+  });
+  for (const [x0, x1, y0, y1] of rects) pad(g, x0, x1, y0, y1, ground);
+  const post = (segment: Segment): [number, number][] => {
+    const [x0, y0, x1, y1] = segment;
+    const points: [number, number][] = [[x0, y0], [x1, y1]];
+    if (Math.hypot(x1 - x0, y1 - y0) > 0.45) points.splice(1, 0, [(x0 + x1) / 2, (y0 + y1) / 2]);
+    return points;
+  };
+  const far = (s: Segment) => s[0] + s[1] + s[2] + s[3] < 0;
+  for (const segment of fences.filter(far)) fence(g, post(segment));
   inside();
-  fence(g, [[0.3, -0.3], [0.3, 0.3], [-0.3, 0.3]]);
+  for (const segment of fences.filter((s) => !far(s))) fence(g, post(segment));
 }
 function cow(g: G, x: number, y: number) {
   for (const dx of [-5, -2, 3, 5]) line(g, 0x5e5046, 1.4, x + dx, y - 4, x + dx, y);
@@ -590,7 +628,12 @@ const modelScale: Partial<Record<DecorationKind, number>> = {
 };
 
 // Hand-modelled props, drawn around the cell centre with their own shadows.
-const models: Partial<Record<DecorationKind, (g: G) => void>> = {
+// Extra facts about a model's surroundings, for drawing it in the world.
+export interface ModelContext {
+  road?: RoadKind | null;
+  pen?: PenLinks;
+}
+const models: Partial<Record<DecorationKind, (g: G, context: ModelContext) => void>> = {
   house(g) {
     const b: Box = [-0.3, 0.3, -0.26, 0.26, 0, 28];
     shadow(g, b);
@@ -1044,14 +1087,14 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
     face(g, 0xd9b048, [0.26, 0.2, 21], [0.26, 0.4, 0], [0.26, 0.4, -3], [0.26, 0.2, 18]);
     face(g, 0xf4c95d, [0.15, 0.2, 21], [0.26, 0.2, 21], [0.26, 0.4, 0], [0.15, 0.4, 0]);
   },
-  cow(g) {
+  cow(g, { pen: links }) {
     pen(g, 0x9fc47e, () => {
       block(g, [-0.24, -0.1, -0.26, -0.18, 0, 4], 0xa98663, 0x8c6b4f, 0x7fb9c2);
       cow(g, ...at(0.08, -0.12));
       cow(g, ...at(-0.1, 0.12));
-    });
+    }, links);
   },
-  sheep(g) {
+  sheep(g, { pen: links }) {
     pen(g, 0xa6c983, () => {
       const [hx, hy] = at(-0.18, -0.2);
       ellipse(g, 0xd9b45f, hx, hy - 4, 12, 9);
@@ -1059,9 +1102,9 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
       sheep(g, ...at(0.12, -0.14));
       sheep(g, ...at(-0.14, 0.04));
       sheep(g, ...at(0.1, 0.14));
-    });
+    }, links);
   },
-  chicken(g) {
+  chicken(g, { pen: links }) {
     pen(g, 0xe0d29a, () => {
       const coop: Box = [-0.26, -0.06, -0.26, -0.1, 0, 12];
       block(g, coop, 0xd7a46c, 0xb5844f);
@@ -1071,9 +1114,9 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
       chicken(g, ...at(-0.12, 0.1), 0xd58a65);
       chicken(g, ...at(0.04, 0.04), 0xf2cc57);
       chicken(g, ...at(0.18, 0.16), 0xf8f3df);
-    });
+    }, links);
   },
-  duck(g) {
+  duck(g, { pen: links }) {
     pen(g, 0x9fc47e, () => {
       const [px, py] = at(-0.02, -0.02);
       ellipse(g, 0xdbd9ab, px, py, 46, 23);
@@ -1082,7 +1125,7 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
       duckling(g, px - 8, py + 1, 0xfff9df);
       duckling(g, px + 7, py + 4, 0xfff9df);
       duckling(g, ...at(0.18, 0.16), 0xf4d35e);
-    });
+    }, links);
   },
   pond(g) {
     ellipse(g, 0x47694b, 4, 4, 74, 32, 0.12);
@@ -1243,23 +1286,23 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
       [0.0, 0.26, (x, y) => deer(g, x, y, false)],
     ]);
   },
-  horses(g) {
+  horses(g, { pen: links }) {
     pen(g, 0x9fc47e, () => {
       const [hx, hy] = at(-0.18, -0.2);
       ellipse(g, 0xd9b45f, hx, hy - 4, 12, 9);
       ellipse(g, 0xeccf7e, hx - 1, hy - 6, 7, 5);
       pony(g, ...at(0.1, -0.12), 0x9b6a45, 0x4a3a2e);
       pony(g, ...at(-0.1, 0.12), 0xefe7d8, 0xc9bba3);
-    });
+    }, links);
   },
-  goats(g) {
+  goats(g, { pen: links }) {
     pen(g, 0xa9c486, () => {
       const [rx, ry] = at(-0.14, -0.14);
       rock(g, rx, ry, 1.3);
       goat(g, rx, ry - 12, 0xf4efe3);
       goat(g, ...at(0.14, -0.06), 0x9b7a5c);
       goat(g, ...at(0.0, 0.14), 0xd9d3c3);
-    });
+    }, links);
   },
   tent(g) {
     const small = (u: number, v: number, roof: number, shade: number, end: number) => {
@@ -1454,7 +1497,8 @@ const doorPaths: Partial<Record<DecorationKind, number>> = {
   funhouse: 0xe6d8b0,
 };
 
-export function decoration(g: G, kind: DecorationKind, road: RoadKind | null = null) {
+export function decoration(g: G, kind: DecorationKind, context: ModelContext = {}) {
+  const road = context.road ?? null;
   if (isRoadKind(kind)) {
     roadTile(g, kind, [false, false, false, false]);
     return;
@@ -1483,7 +1527,7 @@ export function decoration(g: G, kind: DecorationKind, road: RoadKind | null = n
   if (model) {
     const scale = modelScale[kind] ?? 1;
     g.save().scaleCanvas(scale, scale);
-    model(g);
+    model(g, context);
     g.restore();
     return;
   }
