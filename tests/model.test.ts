@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  trainColor,
   trainName,
   reverseTrain,
   setTrain,
@@ -516,4 +517,16 @@ test("trains can be named; the default name is not saved", () => {
   assert.equal(world.train, undefined);
   for (const name of ["", "  boşluklu ", 7, "x".repeat(40)])
     assert.equal(parseWorld(JSON.stringify({ ...line(), train: { name } })), null);
+});
+
+test("trains can be painted; the default colour is not saved", () => {
+  const world = line();
+  assert.equal(trainColor(world), "green");
+  setTrain(world, { color: "red" });
+  assert.equal(trainColor(world), "red");
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  setTrain(world, { color: "green" });
+  assert.equal(world.train, undefined);
+  for (const color of ["green", "pink", 3])
+    assert.equal(parseWorld(JSON.stringify({ ...line(), train: { color } })), null);
 });

@@ -32,6 +32,7 @@ import {
   reverseTrain,
   setTrain,
   trainCargo,
+  trainColor,
   trainName,
   trainWagons,
   wagonStates,
@@ -633,6 +634,7 @@ export class WebTrainScene extends Phaser.Scene {
     const pose = trainPose(this.world, this.trainState);
     return {
       name: trainName(this.world),
+      color: trainColor(this.world),
       wagons: trainWagons(this.world),
       cargo: trainCargo(this.world),
       playing: this.playing,
@@ -819,7 +821,8 @@ export class WebTrainScene extends Phaser.Scene {
     this.trainTrack = this.world.tracks[this.trainState.track];
     const pose = trainPose(this.world, this.trainState);
     this.train.clear();
-    locomotive(this.train, pose.point, pose.tangent);
+    const color = trainColor(this.world);
+    locomotive(this.train, pose.point, pose.tangent, "engine", 0, color);
     this.train.setDepth(10 + project(pose.point).y);
     // Wagons trail behind along the train's own path.
     const wagons = wagonStates(this.world, this.trainState, trainWagons(this.world), this.trail);
@@ -831,7 +834,7 @@ export class WebTrainScene extends Phaser.Scene {
       const state = wagons[i];
       if (!state) return;
       const car = trainPose(this.world, state);
-      locomotive(g, car.point, { x: -car.tangent.x, y: -car.tangent.y }, cargo, i);
+      locomotive(g, car.point, { x: -car.tangent.x, y: -car.tangent.y }, cargo, i, color);
       g.setDepth(10 + project(car.point).y);
       near.push(car.point);
     });
@@ -1019,7 +1022,7 @@ export class WebTrainScene extends Phaser.Scene {
       this.preview.setAlpha(0.6);
       if (piece) {
         const { point, tangent } = sampleTrack(piece, 0.5);
-        locomotive(this.preview, point, tangent);
+        locomotive(this.preview, point, tangent, "engine", 0, trainColor(this.world));
       }
       return;
     }

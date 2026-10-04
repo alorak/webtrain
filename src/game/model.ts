@@ -109,10 +109,23 @@ export interface World {
 }
 
 export type Cargo = "passengers" | "freight";
+// Paint schemes a train can wear; the first is the default.
+export const TRAIN_COLORS = [
+  "green",
+  "red",
+  "blue",
+  "yellow",
+  "orange",
+  "purple",
+  "black",
+  "white",
+] as const;
+export type TrainColor = (typeof TRAIN_COLORS)[number];
 export interface TrainSettings {
   wagons?: number;
   cargo?: Cargo;
   name?: string;
+  color?: TrainColor;
 }
 
 export const vectors: Point[] = [
@@ -733,8 +746,13 @@ export const DEFAULT_TRAIN_NAME = "Tren";
 export const MAX_TRAIN_NAME = 32;
 const cleanTrainName = (name: string) => name.trim().replace(/\s+/g, " ").slice(0, MAX_TRAIN_NAME);
 export const trainName = (world: World) => world.train?.name ?? DEFAULT_TRAIN_NAME;
-export function setTrain(world: World, { wagons, cargo, name }: TrainSettings) {
+export const trainColor = (world: World): TrainColor => world.train?.color ?? TRAIN_COLORS[0];
+export function setTrain(world: World, { wagons, cargo, name, color }: TrainSettings) {
   const next: TrainSettings = { ...world.train };
+  if (color !== undefined && TRAIN_COLORS.includes(color)) {
+    if (color === TRAIN_COLORS[0]) delete next.color;
+    else next.color = color;
+  }
   if (name !== undefined) {
     const value = cleanTrainName(name);
     if (value && value !== DEFAULT_TRAIN_NAME) next.name = value;
@@ -879,14 +897,15 @@ export function parseWorld(raw: string | null): World | null {
 
     if (!validNetwork(data as World)) return null;
     if (data.train !== undefined) {
-      const { wagons, cargo, name, ...rest } = data.train ?? {};
+      const { wagons, cargo, name, color, ...rest } = data.train ?? {};
       if (
         typeof data.train !== "object" ||
         Object.keys(rest).length ||
         (wagons !== undefined && !(Number.isInteger(wagons) && wagons >= 0 && wagons <= MAX_WAGONS)) ||
         (cargo !== undefined && cargo !== "passengers" && cargo !== "freight") ||
         (name !== undefined && (typeof name !== "string" || name !== cleanTrainName(name) || !name)) ||
-        (wagons === undefined && cargo === undefined && name === undefined)
+        (color !== undefined && (!TRAIN_COLORS.includes(color) || color === TRAIN_COLORS[0])) ||
+        (wagons === undefined && cargo === undefined && name === undefined && color === undefined)
       )
         return null;
     }

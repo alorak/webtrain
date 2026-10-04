@@ -1,7 +1,7 @@
 import Phaser from "phaser";
 import "./style.css";
 import { WebTrainScene, type GameStatus } from "./scenes/WebTrainScene";
-import { decoration } from "./game/art";
+import { cssColor, decoration, trainThemes } from "./game/art";
 import {
   deleteSave,
   exportFileName,
@@ -13,6 +13,7 @@ import {
 import {
   MAX_DWELL,
   MAX_WAGONS,
+  TRAIN_COLORS,
   isRoadKind,
   vectors,
   type Chunk,
@@ -367,6 +368,8 @@ function setTrainCollapsed(collapsed: boolean) {
     raiseCard("train-slot");
   }
 }
+const luminance = (color: number) =>
+  (0.299 * ((color >> 16) & 255) + 0.587 * ((color >> 8) & 255) + 0.114 * (color & 255)) / 255;
 function renderTrain() {
   if (!scene || !trainOpen) return;
   const library = document.querySelector(".library")!.getBoundingClientRect();
@@ -377,6 +380,27 @@ function renderTrain() {
   $("follow-train").classList.toggle("active", scene.followingTrain);
   $("follow-train").setAttribute("aria-pressed", String(scene.followingTrain));
   trainChip.classList.toggle("following", scene.followingTrain);
+  // The card and its chip take on the train's colours.
+  const theme = trainThemes[info.color];
+  // A very light body (white) uses its roof colour for buttons instead, and
+  // text on the accent turns dark where the accent is bright (yellow).
+  const accent = luminance(theme.body) > 0.8 ? theme.roof : theme.body;
+  for (const el of [trainPanel, trainChip]) {
+    el.style.setProperty("--train-body", cssColor(theme.body));
+    el.style.setProperty("--train-stripe", cssColor(theme.stripe));
+    el.style.setProperty("--train-accent", cssColor(accent));
+    el.style.setProperty("--train-ink", luminance(accent) > 0.55 ? "#2e3035" : "#fff");
+    // Coloured text on the light card: a bright accent gets a darker shade.
+    el.style.setProperty(
+      "--train-text",
+      luminance(accent) > 0.55 ? `color-mix(in srgb, ${cssColor(accent)} 55%, #000)` : cssColor(accent),
+    );
+  }
+  for (const swatch of document.querySelectorAll<HTMLButtonElement>("#train-colors button")) {
+    const active = swatch.dataset.color === info.color;
+    swatch.classList.toggle("active", active);
+    swatch.setAttribute("aria-checked", String(active));
+  }
   const stationName = info.station
     ? info.station.name || stationDefaultName(info.station.kind)
     : "";
@@ -823,6 +847,21 @@ bind("wagons-plus", () => stepWagons(1));
 bind("cargo-passengers", () => scene.setTrainSettings({ cargo: "passengers" }));
 bind("cargo-freight", () => scene.setTrainSettings({ cargo: "freight" }));
 bind("reverse-train", () => scene.reverseTrain());
+// One swatch per paint scheme: the body colour with its stripe below.
+for (const color of TRAIN_COLORS) {
+  const theme = trainThemes[color];
+  const swatch = document.createElement("button");
+  swatch.type = "button";
+  swatch.dataset.color = color;
+  swatch.title = theme.label;
+  swatch.setAttribute("role", "radio");
+  swatch.setAttribute("aria-label", theme.label);
+  swatch.style.setProperty("--swatch-body", cssColor(theme.body));
+  swatch.style.setProperty("--swatch-stripe", cssColor(theme.stripe));
+  swatch.style.setProperty("--swatch-roof", cssColor(theme.roof));
+  swatch.addEventListener("click", () => scene.setTrainSettings({ color }));
+  $("train-colors").append(swatch);
+}
 bind("place-train", () => scene.setPlacingTrain(!scene.placingTrain));
 bind("hide-station", () => setStationCollapsed(true));
 bind("station-chip", () => setStationCollapsed(false));

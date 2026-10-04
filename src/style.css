@@ -3671,3 +3671,72 @@ button.game-logo:focus-visible {
     max-height: calc(100vh - 76px);
   }
 }
+
+/* Train colour: swatches show the body with its roof and stripe, and the
+   card and its chip pick up the chosen colours. */
+.train-colors {
+  display: flex;
+  gap: 4px;
+}
+.train-colors button {
+  position: relative;
+  width: 19px;
+  height: 19px;
+  padding: 0;
+  border-radius: 6px;
+  background: linear-gradient(
+    var(--swatch-roof) 0 28%,
+    var(--swatch-body) 28% 58%,
+    var(--swatch-stripe) 58% 72%,
+    var(--swatch-body) 72%
+  );
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 14%);
+  transition: transform 0.12s ease;
+}
+.train-colors button:hover {
+  transform: translateY(-1px);
+}
+.train-colors button.active {
+  box-shadow:
+    inset 0 0 0 1px rgb(0 0 0 / 14%),
+    0 0 0 2px #fcfbf2,
+    0 0 0 3.5px var(--swatch-body);
+}
+.train-panel {
+  border-top: 4px solid var(--train-accent, #377c79);
+}
+.train-panel #train-title::before,
+#train-chip::before {
+  content: "";
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border-radius: 3px;
+  background: var(--train-body, #377c79);
+  box-shadow:
+    inset 0 -3px 0 var(--train-stripe, #f2d27a),
+    0 0 0 1px rgb(0 0 0 / 12%);
+  vertical-align: 0;
+}
+#train-chip.following::before {
+  border-radius: 50%;
+  background: #2c9c64;
+  box-shadow: none;
+}
+.train-panel .train-actions button.active {
+  background: var(--train-accent, #2c9c64);
+  color: var(--train-ink, #fff);
+}
+.train-panel .segmented button.active {
+  color: var(--train-text, #2f5a44);
+}
+@media (max-width: 759px) {
+  .train-colors {
+    gap: 3px;
+  }
+  .train-colors button {
+    width: 16px;
+    height: 16px;
+  }
+}
