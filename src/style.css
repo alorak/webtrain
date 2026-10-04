@@ -1280,3 +1280,231 @@ kbd {
     bottom: 78px;
   }
 }
+
+
+/* Child-friendly icon rail */
+.library {
+  position: fixed;
+  z-index: 20;
+  top: 50%;
+  right: 14px;
+  bottom: auto;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  transform: translateY(-50%);
+  pointer-events: none;
+}
+
+.tool-rail {
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 10px 8px;
+  border-radius: 22px;
+  background: rgb(220 244 195 / 94%);
+  border: 1px solid rgb(255 255 255 / 72%);
+  box-shadow: 0 8px 24px rgb(49 83 45 / 18%);
+  backdrop-filter: blur(8px);
+}
+
+.rail-button {
+  width: 64px;
+  height: 64px;
+  padding: 0;
+  border: 3px solid rgb(255 255 255 / 55%);
+  border-radius: 19px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  box-shadow:
+    inset 0 -5px 0 rgb(0 0 0 / 13%),
+    0 4px 10px rgb(52 83 42 / 16%);
+}
+
+.rail-button svg {
+  width: 35px;
+  height: 35px;
+  stroke-width: 2.2;
+}
+
+.rail-nature {
+  background: #6fbd4b;
+}
+
+.rail-home {
+  background: #8f62cf;
+}
+
+.rail-track {
+  background: #f19928;
+}
+
+.rail-train {
+  background: #dc496c;
+}
+
+.rail-button.active {
+  border-color: #fff;
+  box-shadow:
+    0 0 0 4px rgb(255 255 255 / 70%),
+    inset 0 -5px 0 rgb(0 0 0 / 13%),
+    0 7px 15px rgb(47 75 41 / 22%);
+  transform: translateX(-3px);
+}
+
+.rail-train.playing {
+  box-shadow:
+    0 0 0 4px rgb(255 236 159 / 82%),
+    inset 0 -5px 0 rgb(0 0 0 / 13%),
+    0 7px 15px rgb(47 75 41 / 22%);
+}
+
+.decoration-grid {
+  pointer-events: auto;
+  width: 118px;
+  max-height: min(72vh, 520px);
+  padding: 12px 10px;
+  border: 0;
+  border-left: 6px solid #2c9c64;
+  border-radius: 22px 10px 10px 22px;
+  background: rgb(255 254 250 / 96%);
+  box-shadow: 0 10px 28px rgb(49 79 43 / 20%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  align-content: initial;
+  scrollbar-width: none;
+}
+
+.decoration-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.decor-card {
+  position: relative;
+  flex: 0 0 auto;
+  width: 92px;
+  min-height: 108px;
+  padding: 4px;
+  margin: 0;
+  border: 0;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  box-shadow: none;
+  background: #f8f7ef;
+}
+
+.decor-card.sage {
+  background: #eef5df;
+}
+
+.decor-card.sun {
+  background: #fff3cf;
+}
+
+.decor-card.peach {
+  background: #f8e6dc;
+}
+
+.decor-card img {
+  width: 84px;
+  height: 98px;
+  margin: 0;
+  object-fit: contain;
+  pointer-events: none;
+}
+
+.decor-card.selected {
+  outline: 4px solid #3f7456;
+  outline-offset: -4px;
+  transform: none;
+}
+
+.decor-card:hover {
+  transform: none;
+}
+
+@media (max-width: 759px) {
+  .library {
+    top: 50%;
+    right: 6px;
+    bottom: auto;
+    width: auto;
+    padding: 0;
+    gap: 6px;
+    transform: translateY(-50%);
+  }
+
+  .tool-rail {
+    gap: 8px;
+    padding: 7px 5px;
+    border-radius: 17px;
+  }
+
+  .rail-button {
+    width: 52px;
+    height: 52px;
+    border-radius: 15px;
+  }
+
+  .rail-button svg {
+    width: 29px;
+    height: 29px;
+  }
+
+  .decoration-grid {
+    width: 94px;
+    max-height: 66vh;
+    padding: 8px 6px;
+    border-left-width: 5px;
+    border-radius: 17px 8px 8px 17px;
+    gap: 7px;
+  }
+
+  .decor-card {
+    width: 77px;
+    min-height: 88px;
+    border-radius: 12px;
+    padding: 2px;
+  }
+
+  .decor-card img {
+    width: 72px;
+    height: 82px;
+  }
+}
+
+@media (max-height: 520px) {
+  .tool-rail {
+    gap: 6px;
+    padding: 6px 5px;
+  }
+
+  .rail-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+  }
+
+  .rail-button svg {
+    width: 27px;
+    height: 27px;
+  }
+
+  .decoration-grid {
+    max-height: 78vh;
+  }
+}

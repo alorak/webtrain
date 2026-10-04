@@ -70,36 +70,50 @@
           data-icon="new"
         ></button>
       </div>
-      <aside class="library" aria-label="Dünya oluşturma araçları">
-        <div class="library-heading">
-          <div>
-            <span class="eyebrow">BİRAZ HAYAL GÜCÜ</span>
-            <h2>Dünyana ekle<span>.</span></h2>
-          </div>
-          <span class="heading-star">✳</span>
-        </div>
-        <div class="mode-switch">
-          <button id="track-tool" class="active" aria-pressed="true">
-            <span data-icon="track"></span> Ray döşe</button
-          ><button id="decor-mode" aria-pressed="false">
-            <span data-icon="tree"></span> Dekor ekle
-          </button>
-        </div>
-        <div class="section-label">KÜÇÜK ŞEYLER, BÜYÜK HİKÂYELER</div>
-        <div class="categories" role="group" aria-label="Dekor kategorisi">
-          <button class="active" data-category="all" aria-pressed="true">
-            Tümü</button
-          ><button data-category="nature" aria-pressed="false">Doğa</button
-          ><button data-category="buildings" aria-pressed="false">
-            Yapılar</button
-          ><button data-category="fun" aria-pressed="false">Eğlence</button>
-        </div>
-        <div id="decoration-grid" class="decoration-grid"></div>
-        <div class="library-bottom">
-          <button id="erase-tool" aria-pressed="false">
-            <span data-icon="erase"></span> Silgi</button
-          ><span>Seç, sonra haritaya dokun.</span>
-        </div>
+      <aside class="library" aria-label="Dünya araçları">
+        <div
+          id="decoration-grid"
+          class="decoration-grid"
+          aria-label="Eklenecek nesneler"
+        ></div>
+        <nav class="tool-rail" aria-label="Araç kategorileri">
+          <button
+            id="panel-nature"
+            class="rail-button rail-nature active"
+            type="button"
+            data-panel="nature"
+            data-icon="tree"
+            aria-label="Doğa"
+            aria-pressed="true"
+          ></button>
+          <button
+            id="panel-home"
+            class="rail-button rail-home"
+            type="button"
+            data-panel="buildings"
+            data-icon="house"
+            aria-label="Evler"
+            aria-pressed="false"
+          ></button>
+          <button
+            id="track-tool"
+            class="rail-button rail-track"
+            type="button"
+            data-panel="track"
+            data-icon="track"
+            aria-label="Ray"
+            aria-pressed="false"
+          ></button>
+          <button
+            id="train-tool"
+            class="rail-button rail-train"
+            type="button"
+            data-panel="train"
+            data-icon="train"
+            aria-label="Tren"
+            aria-pressed="false"
+          ></button>
+        </nav>
       </aside>
       <div
         id="track-actions"

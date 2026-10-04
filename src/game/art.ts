@@ -128,6 +128,25 @@ export function decoration(g: G, kind: DecorationKind) {
     ellipse(g, 0x92bc7d, 1, -65, 34, 31);
     ellipse(g, 0x72a469, 21, -48, 29, 36);
     ellipse(g, 0xa5ca87, -9, -68, 14, 8);
+  } else if (kind === "duck") {
+    ellipse(g, 0xf8f1d8, -4, -17, 44, 27);
+    ellipse(g, 0xffffff, -9, -21, 34, 23);
+    ellipse(g, 0xf8f1d8, 15, -38, 23, 23);
+    ellipse(g, 0xffffff, 12, -41, 17, 17);
+    poly(g, 0xe3a64a, [25, -40, 39, -35, 25, -31]);
+    ellipse(g, 0x2f4b43, 17, -43, 3.5, 3.5);
+    poly(g, 0xe9c66b, [-24, -19, -35, -28, -30, -12]);
+    line(g, 0xc88446, 2, -10, -4, -12, 6);
+    line(g, 0xc88446, 2, 4, -4, 3, 6);
+    line(g, 0xc88446, 2, -17, 6, -7, 6);
+    line(g, 0xc88446, 2, -2, 6, 8, 6);
+
+    ellipse(g, 0xf4d46b, 31, -3, 20, 16);
+    ellipse(g, 0xf7dd83, 36, -15, 13, 13);
+    poly(g, 0xe0a044, [43, -15, 50, -12, 43, -9]);
+    ellipse(g, 0x355048, 38, -17, 2.5, 2.5);
+    line(g, 0xc88446, 1.5, 29, 5, 28, 11);
+    line(g, 0xc88446, 1.5, 35, 5, 35, 11);
   } else if (kind === "house") {
     poly(g, 0xf5e9ca, [-27, -9, 5, 7, 5, -33, -27, -47]);
     poly(g, 0xdec9a6, [5, 7, 31, -7, 31, -45, 5, -33]);
