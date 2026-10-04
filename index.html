@@ -46,21 +46,48 @@
         <h1>Bir yol, bin hikâye.</h1>
         <p>Bir sonraki durak hayal gücün.</p>
       </div>
-      <div class="history-tools floating">
-        <button
-          id="undo"
-          class="icon-button"
-          title="Geri al (Ctrl/⌘ Z)"
-          aria-label="Geri al"
-          data-icon="undo"
-        ></button
-        ><button
-          id="redo"
-          class="icon-button"
-          title="Yinele (Ctrl/⌘ Shift Z)"
-          aria-label="Yinele"
-          data-icon="redo"
-        ></button>
+      <div class="history-tools floating map-controls" aria-label="Harita kontrolleri">
+        <div class="map-control-row map-control-row--top">
+          <button
+            id="undo"
+            class="icon-button"
+            title="Geri al (Ctrl/⌘ Z)"
+            aria-label="Geri al"
+            data-icon="undo"
+          ></button
+          ><button
+            id="redo"
+            class="icon-button"
+            title="Yinele (Ctrl/⌘ Shift Z)"
+            aria-label="Yinele"
+            data-icon="redo"
+          ></button
+          ><button
+            id="home"
+            class="icon-button"
+            aria-label="Haritayı ortala"
+            title="Haritayı ortala"
+            data-icon="focus"
+          ></button>
+        </div>
+        <span class="map-control-divider"></span>
+        <div class="map-control-row map-control-row--zoom">
+          <button
+            id="zoom-out"
+            class="icon-button"
+            aria-label="Uzaklaştır"
+            title="Uzaklaştır"
+            data-icon="minus"
+          ></button
+          ><span id="zoom-label">100%</span
+          ><button
+            id="zoom-in"
+            class="icon-button"
+            aria-label="Yakınlaştır"
+            title="Yakınlaştır"
+            data-icon="plus"
+          ></button>
+        </div>
       </div>
       <aside class="library" aria-label="Dünya araçları">
         <div
@@ -207,31 +234,7 @@
         class="expand-controls"
         aria-label="Haritayı genişlet"
       ></div>
-            <div class="view-tools floating">
-        <button
-          id="zoom-in"
-          class="icon-button"
-          aria-label="Yakınlaştır"
-          title="Yakınlaştır"
-          data-icon="plus"
-        ></button
-        ><span id="zoom-label">100%</span
-        ><button
-          id="zoom-out"
-          class="icon-button"
-          aria-label="Uzaklaştır"
-          title="Uzaklaştır"
-          data-icon="minus"
-        ></button
-        ><span class="horizontal-divider"></span
-        ><button
-          id="home"
-          class="icon-button"
-          aria-label="Haritayı ortala"
-          title="Haritayı ortala"
-          data-icon="focus"
-        ></button>
-      </div>
+            
       <div class="bottom-bar">
         <div class="hint">
           <span class="hint-icon" data-icon="pointer"></span
