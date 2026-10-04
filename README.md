@@ -11,7 +11,7 @@
 - **Tren:** Sağ alttaki yeşil oynat/durdur düğmesini kullan. Tren makasların gösterdiği yöne gider, yolun sonunda geri döner, kapalı döngülerde turlar.
 - **Kamera:** Haritayı sürükle. Fare tekerleği, iki parmak veya +/− düğmeleriyle yakınlaş. Ortala düğmesi dünyayı tekrar kadraja alır.
 - **Geri al/yinele:** Son 60 değişiklik oturum boyunca geri alınabilir. Yeni oyun, kayıttan açma ve içe aktarma da geri alınabilir.
-- **Oyun menüsü:** Sol üstteki dosya düğmesi oyun penceresini açar: *Yeni oyun*, *Kaydet* (adlandırılmış kayıt; aynı ad güncellenir), *Kayıttan aç* (kayıtları tarih, ray ve dekor sayısıyla listeler; silinebilir), *Dışa aktar* (dünyayı `webtrain-<ad>.json` olarak indirir) ve *İçe aktar* (dışa aktarılmış ya da düz bir dünya JSON dosyasını yükler; bozuk dosyalar reddedilir).
+- **Oyun menüsü:** Sağ üstteki Trains logosu oyun penceresini açar: *Yeni oyun*, *Kaydet* (adlandırılmış kayıt; aynı ad güncellenir), *Kayıttan aç* (kayıtları tarih, ray ve dekor sayısıyla listeler; silinebilir), *Dışa aktar* (dünyayı `webtrain-<ad>.json` olarak indirir) ve *İçe aktar* (dışa aktarılmış ya da düz bir dünya JSON dosyasını yükler; bozuk dosyalar reddedilir).
 - **Kayıt:** Dünya her değişiklikte bu tarayıcının `localStorage` alanına kaydedilir. Sunucuya gönderilmez. Tarayıcı verileri silinirse dünya kaybolur; kayıt engelliyse oyun o oturumda çalışmaya devam eder. Geri alma geçmişi yenilemede sıfırlanır. Adlandırılmış kayıtlar da yalnızca bu tarayıcıda, `webtrain-saves-v1` anahtarındaki kayıt dizininde tutulur; başka bir cihaza taşımak için dışa aktar.
 
 Klavye: `1` ray, `2` son dekor, `E` silgi, `Space` tren, `Ctrl/⌘ Z` geri al, `Ctrl/⌘ Shift Z` yinele. Mobilde aynı araçlar sağ paneldedir.
