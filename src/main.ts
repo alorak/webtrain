@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import "./style.css";
 import { WebTrainScene, type GameStatus } from "./scenes/WebTrainScene";
 import { decoration } from "./game/art";
-import { vectors, type DecorationKind, type Turn } from "./game/model";
+import { candidate, vectors, type DecorationKind, type Turn } from "./game/model";
 const paths: Record<string, string> = {
   train:
     '<rect x="4" y="8" width="14" height="10" rx="3"/><path d="M7 8V4h7v4M18 11h3v7H3M7 21h.01M16 21h.01M8 12h5"/>',
@@ -88,15 +88,24 @@ function showPanel(panel: SidePanel) {
     panel === "nature" ? "nature" : panel === "buildings" ? "buildings" : null;
   const grid = $("decoration-grid");
   grid.hidden = category === null;
+
+  const visibleCards: HTMLButtonElement[] = [];
   grid.querySelectorAll<HTMLButtonElement>("[data-group]").forEach((button) => {
-    button.hidden = category !== null && button.dataset.group !== category;
+    button.classList.remove("wide");
+    button.hidden = category === null || button.dataset.group !== category;
+    if (!button.hidden) visibleCards.push(button);
   });
+
+  // Two columns fill the panel; an odd final card spans the full width.
+  if (visibleCards.length % 2 === 1) visibleCards.at(-1)?.classList.add("wide");
+
   document.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach((button) => {
     const active = button.dataset.panel === panel;
     button.classList.toggle("active", active);
     button.setAttribute("aria-pressed", String(active));
   });
 }
+showPanel("nature");
 let speed = 1;
 let toastTimer: ReturnType<typeof setTimeout>;
 function toast(message: string) {
@@ -132,14 +141,7 @@ function refresh(status: GameStatus) {
   $("save-status").textContent = status.saved
     ? "Kaydedildi"
     : "Kayıt kullanılamıyor";
-  const heading = vectors[status.world.tracks.at(-1)!.exit];
-  const angle =
-    (Math.atan2(heading.x + heading.y, (heading.x - heading.y) * 2) * 180) /
-      Math.PI +
-    90;
-  document
-    .querySelectorAll<SVGElement>("[data-turn] svg")
-    .forEach((svg) => (svg.style.transform = `rotate(${angle}deg)`));
+
 }
 
 game.events.once("world-ready", (ready: WebTrainScene) => {
@@ -147,33 +149,66 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
   scene.onChange = refresh;
   scene.onMessage = toast;
   let previousAnchor = "";
-  scene.onAnchor = (x, y, visible, blocked) => {
-    const anchor = `${x},${y},${visible},${blocked},${window.innerWidth},${window.innerHeight}`;
+  scene.onAnchor = (x, y, visible, _blocked) => {
+    const lastTrack = scene.world.tracks.at(-1)!;
+    const heading = lastTrack.exit;
+    const panel = document.querySelector(".library")!.getBoundingClientRect();
+    const right = panel.left - (window.innerWidth < 760 ? 8 : 12);
+    const radius = window.innerWidth < 760 ? 62 : 76;
+    const safe = radius + 14;
+    const anchor = `${Math.round(x)},${Math.round(y)},${visible},${heading},${Math.round(right)},${window.innerWidth},${window.innerHeight}`;
     if (anchor === previousAnchor) return;
     previousAnchor = anchor;
+
     const el = $("track-actions");
-    const panel = document.querySelector(".library")!.getBoundingClientRect();
-    const right = window.innerWidth < 760 ? panel.left - 8 : panel.left - 16;
     const shown =
       visible &&
-      x > 45 &&
-      x < right &&
-      y > 55 &&
-      y <
-        window.innerHeight -
-          (window.innerWidth < 760 ? 70 : window.innerHeight < 550 ? 65 : 70);
+      x > 18 &&
+      x < right - 18 &&
+      y > 18 &&
+      y < window.innerHeight - 18;
     el.hidden = !shown;
-    const center = Math.max(98, Math.min(right - 92, x));
-    el.style.left = `${center}px`;
-    el.style.setProperty("--anchor-offset", `${x - center}px`);
-    el.style.top = `${Math.max(88, y)}px`;
-    el.style.setProperty("--anchor-y-offset", `${y - Math.max(88, y)}px`);
-    el.querySelector(".endpoint-label")!.textContent = blocked
-      ? "YER YOK · SON RAYI SİLİP YÖN DEĞİŞTİR"
-      : "YOLUN BURADAN DEVAM ETSİN";
-    el.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach(
-      (b) => (b.disabled = blocked),
+    if (!shown) return;
+
+    const centerX = Phaser.Math.Clamp(x, safe, Math.max(safe, right - safe));
+    const centerY = Phaser.Math.Clamp(
+      y,
+      safe,
+      Math.max(safe, window.innerHeight - safe),
     );
+    el.style.left = `${centerX}px`;
+    el.style.top = `${centerY}px`;
+
+    const screenVector = (targetHeading: number) => {
+      const world = vectors[targetHeading];
+      const sx = (world.x - world.y) * 48;
+      const sy = (world.x + world.y) * 24;
+      const length = Math.hypot(sx, sy) || 1;
+      return { x: sx / length, y: sy / length };
+    };
+
+    const forward = screenVector(heading);
+
+    el.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
+      const turn = Number(button.dataset.turn) as Turn;
+      const targetHeading = (heading + turn + 4) % 4;
+      const direction = screenVector(targetHeading);
+      const targetAngle =
+        (Math.atan2(direction.y, direction.x) * 180) / Math.PI;
+      // Each SVG has a different native arrow-head direction.
+      const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
+      const rotation = targetAngle - nativeAngle;
+
+      button.style.setProperty("--turn-x", `${direction.x * radius}px`);
+      button.style.setProperty("--turn-y", `${direction.y * radius}px`);
+      button.style.setProperty("--turn-rotation", `${rotation}deg`);
+      button.disabled = !candidate(scene.world, turn);
+    });
+
+    // Delete sits behind the endpoint, away from all three possible new tracks.
+    const remove = $<HTMLButtonElement>("remove-track");
+    remove.style.setProperty("--delete-x", `${-forward.x * radius * 0.82}px`);
+    remove.style.setProperty("--delete-y", `${-forward.y * radius * 0.82}px`);
   };
   let previousDecorationAnchor = "";
   scene.onDecorationAnchor = (x, y, visible) => {
