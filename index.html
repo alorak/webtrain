@@ -259,13 +259,23 @@
           Hadi başlayalım <span>↗</span>
         </button>
       </dialog>
-      <dialog id="expand-dialog">
-        <span class="eyebrow">YENİ ALAN</span>
-        <h2>Haritayı genişlet?</h2>
-        <p>Bu yönde yeni bir 24 × 24 oyun alanı açılacak. Emin misin?</p>
-        <div class="dialog-actions">
-          <button id="cancel-expand">İptal</button
-          ><button id="confirm-expand" class="primary">Genişlet</button>
+      <dialog id="expand-dialog" aria-labelledby="expand-title">
+        <h2 id="expand-title">GENİŞLET?</h2>
+        <div class="dialog-actions expand-dialog-actions">
+          <button
+            id="confirm-expand"
+            class="primary expand-confirm"
+            type="button"
+            aria-label="Genişlet"
+            data-icon="forward"
+          ></button>
+          <button
+            id="cancel-expand"
+            class="expand-cancel"
+            type="button"
+            aria-label="İptal"
+            data-icon="close"
+          ></button>
         </div>
       </dialog>
             <dialog id="reset-dialog">
