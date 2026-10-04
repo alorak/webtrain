@@ -2411,6 +2411,137 @@ kbd {
 }
 
 
+/* Station panel: a window on the left with a live view of the station */
+.station-panel {
+  position: fixed;
+  z-index: 30;
+  top: 76px;
+  left: 16px;
+  width: min(304px, calc(100vw - 32px));
+  padding: 12px 12px 14px;
+  border-radius: 20px;
+  background: #fcfbf2;
+  border: 1px solid #e6e9da;
+  box-shadow: 0 14px 40px rgb(33 60 54 / 22%);
+  color: #425641;
+}
+.station-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 8px;
+}
+.station-panel h2 {
+  margin: 0;
+  font-size: 16px;
+}
+.station-body {
+  display: flex;
+  gap: 8px;
+}
+/* Live view: a copy of what the station camera draws each frame. */
+.station-view {
+  position: relative;
+  flex: 1;
+  height: 168px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #a7c882;
+}
+.station-view::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 6px;
+  box-shadow:
+    inset 0 0 0 3px #e4dcc4,
+    inset 0 0 0 4px rgb(66 86 65 / 25%);
+  pointer-events: none;
+}
+#station-canvas {
+  width: 100%;
+  height: 100%;
+}
+.station-lights {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  padding: 6px;
+  border-radius: 12px;
+  background: #f1f3e6;
+}
+.station-light {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 3px solid #fffaf0;
+  box-shadow: 0 2px 4px rgb(0 0 0 / 18%);
+  opacity: 0.35;
+}
+.station-light.open {
+  background: radial-gradient(circle at 35% 35%, #8fe0a8, #2c9c64 60%);
+}
+.station-light.closed {
+  background: radial-gradient(circle at 35% 35%, #f6a596, #d0503d 60%);
+}
+.station-light.active {
+  opacity: 1;
+  box-shadow:
+    0 0 0 2px rgb(66 86 65 / 20%),
+    0 0 12px rgb(255 240 180 / 70%);
+}
+.station-status {
+  margin: 10px 2px 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: #52634b;
+}
+.station-status.waiting {
+  color: #b5763a;
+}
+.station-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  background: #f1f3e6;
+  font-size: 12px;
+  font-weight: 650;
+}
+.stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.stepper button {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: #fffef8;
+  border: 1.5px solid #d6dcc6;
+  font-size: 16px;
+  font-weight: 700;
+  color: #3d5a45;
+}
+.stepper output {
+  min-width: 42px;
+  text-align: center;
+  font-size: 13px;
+}
+@media (max-width: 759px) {
+  .station-panel {
+    top: 62px;
+    left: 8px;
+    width: min(300px, calc(100vw - 96px));
+  }
+  .station-view {
+    height: 132px;
+  }
+}
+
 /* Game menu: new, save, open, export and import */
 .game-dialog {
   max-width: 760px;

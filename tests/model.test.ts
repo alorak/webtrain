@@ -12,6 +12,8 @@ import {
   removableTrack,
   removeTrack,
   penLinks,
+  setStation,
+  stationStop,
   doorsOnRoad,
   entrances,
   roadAtEntrance,
@@ -363,4 +365,41 @@ test("neighbouring animal pens of any kind join into one", () => {
     sides: [false, false, false, false],
     corners: [false, false, false, false],
   });
+});
+
+test("open stations hold trains at the middle of their rail", () => {
+  const world = line();
+  assert.ok(placeDecoration(world, { x: 9, y: 8 }, "stationSmall"));
+  // Crossing into the station piece and past its middle stops the train.
+  const stop = stationStop(
+    world,
+    { track: 0, forward: true, t: 0.9 },
+    { track: 1, forward: true, t: 0.55 },
+  )!;
+  assert.deepEqual(stop.state, { track: 1, forward: true, t: 0.5 });
+  assert.equal(stop.station.kind, "stationSmall");
+  // Travelling the other way on the station piece also counts.
+  assert.ok(stationStop(world, { track: 1, forward: false, t: 0.6 }, { track: 1, forward: false, t: 0.45 }));
+  // Leaving the middle does not stop it again.
+  assert.equal(stationStop(world, { track: 1, forward: true, t: 0.5 }, { track: 1, forward: true, t: 0.6 }), null);
+  // Closed stations let trains through.
+  assert.ok(setStation(world, { x: 9, y: 8 }, { closed: true, dwell: 7 }));
+  assert.equal(stationStop(world, { track: 0, forward: true, t: 0.9 }, { track: 1, forward: true, t: 0.55 }), null);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  // Back to defaults leaves nothing extra in the save.
+  setStation(world, { x: 9, y: 8 }, { closed: false, dwell: 3 });
+  assert.deepEqual(world.decorations[0], { x: 9, y: 8, kind: "stationSmall" });
+  assert.equal(setStation(world, { x: 10, y: 8 }, { dwell: 5 }), false);
+});
+
+test("station settings are validated when loading", () => {
+  const base = line();
+  const bad = [
+    { x: 9, y: 8, kind: "stationSmall", dwell: 0 },
+    { x: 9, y: 8, kind: "stationSmall", dwell: 2.5 },
+    { x: 9, y: 8, kind: "stationSmall", closed: "yes" },
+    { x: 9, y: 8, kind: "tunnelStone", dwell: 4 },
+  ];
+  for (const decoration of bad)
+    assert.equal(parseWorld(JSON.stringify({ ...base, decorations: [decoration] })), null);
 });

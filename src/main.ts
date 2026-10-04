@@ -11,11 +11,13 @@ import {
   writeSave,
 } from "./game/saves";
 import {
+  MAX_DWELL,
   vectors,
   type Chunk,
   type ChunkEdge,
   type BranchKind,
   type DecorationKind,
+  type Point,
   type Turn,
 } from "./game/model";
 const paths: Record<string, string> = {
@@ -198,7 +200,43 @@ function toast(message: string) {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => $("toast").classList.remove("visible"), 3400);
 }
+// Station panel (left): live view of the station, open/closed lights and
+// how long trains wait there.
+const stationPanel = $("station-panel");
+let stationCell: Point | null = null;
+let stationTimer = 0;
+function renderStation() {
+  if (!scene || !stationCell) return;
+  const info = scene.stationInfo(stationCell);
+  if (!info) return;
+  $("station-title").textContent = items.find((i) => i.kind === info.kind)?.name ?? "İstasyon";
+  for (const [id, active] of [["station-open", !info.closed], ["station-closed", info.closed]] as const) {
+    $(id).classList.toggle("active", active);
+    $(id).setAttribute("aria-pressed", String(active));
+  }
+  $("station-dwell-row").hidden = info.closed;
+  $("dwell-value").textContent = `${info.dwell} sn`;
+  $<HTMLButtonElement>("dwell-minus").disabled = info.dwell <= 1;
+  $<HTMLButtonElement>("dwell-plus").disabled = info.dwell >= MAX_DWELL;
+  $("station-status").textContent = info.closed
+    ? "Kapalı · Trenler durmadan geçer."
+    : info.waiting
+      ? `Tren istasyonda · ${info.remaining} sn sonra kalkacak`
+      : `Açık · Trenler ${info.dwell} sn bekler.`;
+  $("station-status").classList.toggle("waiting", info.waiting);
+}
+function placeStationView() {
+  if (!scene || !stationCell) return;
+  const rect = $("station-view").getBoundingClientRect();
+  scene.setStationView(
+    rect.width ? { x: rect.left, y: rect.top, width: rect.width, height: rect.height } : null,
+    $<HTMLCanvasElement>("station-canvas"),
+  );
+}
+window.addEventListener("resize", () => requestAnimationFrame(placeStationView));
+
 function refresh(status: GameStatus) {
+  if (stationCell) renderStation();
   document.querySelectorAll<HTMLElement>("[data-kind]").forEach((el) => {
     const active = el.dataset.kind === status.tool;
     el.classList.toggle("selected", active);
@@ -266,6 +304,15 @@ const screenVector = (heading: number) => {
 game.events.once("world-ready", (ready: WebTrainScene) => {
   scene = ready;
   scene.onChange = refresh;
+  scene.onStation = (cell) => {
+    stationCell = cell;
+    stationPanel.hidden = !cell;
+    clearInterval(stationTimer);
+    if (!cell) return;
+    renderStation();
+    requestAnimationFrame(placeStationView);
+    stationTimer = window.setInterval(renderStation, 250);
+  };
   scene.onMessage = toast;
   let previousRail = "";
   scene.onRailControls = (controls) => {
@@ -503,6 +550,15 @@ document
     button.onblur = () => scene?.previewBranch(null);
   });
 bind("switch-toggle", () => scene.toggleSelectedSwitch());
+bind("close-station", () => scene.selectStation(null));
+bind("station-open", () => scene.setStationSettings({ closed: false }));
+bind("station-closed", () => scene.setStationSettings({ closed: true }));
+const stepDwell = (by: number) => {
+  const info = stationCell && scene.stationInfo(stationCell);
+  if (info) scene.setStationSettings({ dwell: info.dwell + by });
+};
+bind("dwell-minus", () => stepDwell(-1));
+bind("dwell-plus", () => stepDwell(1));
 
 document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
   (button) =>
