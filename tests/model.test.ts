@@ -83,6 +83,19 @@ test("rails and decorations cannot overlap or leave the map", () => {
   assert.equal(candidate(world, 1), null);
   assert.equal(inside({ x: 1.5, y: 1 }), false);
 });
+test("rail infrastructure can occupy a track but ordinary scenery cannot", () => {
+  const world = fresh();
+  assert.equal(placeDecoration(world, { x: 8, y: 8 }, "house"), false);
+  assert.equal(placeDecoration(world, { x: 8, y: 8 }, "stationSmall"), true);
+  assert.equal(placeDecoration(world, { x: 8, y: 8 }, "tunnelStone"), false);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+
+  const noTrack = fresh();
+  assert.equal(placeDecoration(noTrack, { x: 9, y: 8 }, "stationSmall"), false);
+  assert.equal(placeDecoration(noTrack, { x: 9, y: 8 }, "water"), true);
+  assert.deepEqual(parseWorld(JSON.stringify(noTrack)), noTrack);
+});
+
 test("compatible returns to the start close the loop without duplicate cells", () => {
   const world = fresh();
   for (const turn of [1, 1, 0, 1, 1] as Turn[])
