@@ -328,6 +328,13 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
   }
   scene.emit();
 });
+type DeleteTarget = "track" | "decoration";
+let pendingDelete: DeleteTarget | null = null;
+const requestDelete = (target: DeleteTarget) => {
+  pendingDelete = target;
+  $<HTMLDialogElement>("delete-dialog").showModal();
+};
+
 const bind = (id: string, fn: () => void) =>
   $(id).addEventListener("click", () => {
     if (scene) fn();
@@ -391,13 +398,6 @@ document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
       scene?.setTool(kind);
     }),
 );
-
-type DeleteTarget = "track" | "decoration";
-let pendingDelete: DeleteTarget | null = null;
-const requestDelete = (target: DeleteTarget) => {
-  pendingDelete = target;
-  $<HTMLDialogElement>("delete-dialog").showModal();
-};
 
 const help = $<HTMLDialogElement>("help-dialog"),
   reset = $<HTMLDialogElement>("reset-dialog"),
