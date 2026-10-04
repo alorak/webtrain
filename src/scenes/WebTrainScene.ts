@@ -446,14 +446,22 @@ export class WebTrainScene extends Phaser.Scene {
           };
           const worldPoint = project(midpoint);
           const worldNext = project(nextCenter);
-          const screenX =
+          const edgeScreenX =
             (worldPoint.x - camera.scrollX - camera.width / 2) * camera.zoom +
             camera.width / 2;
-          const screenY =
+          const edgeScreenY =
             (worldPoint.y - camera.scrollY - camera.height / 2) * camera.zoom +
             camera.height / 2;
           const dx = worldNext.x - worldPoint.x;
           const dy = worldNext.y - worldPoint.y;
+          const length = Math.hypot(dx, dy) || 1;
+
+          // Keep the control completely outside the board instead of sitting
+          // on top of playable cells. The offset stays screen-sized while zooming.
+          const outwardOffset = camera.width < 760 ? 38 : 46;
+          const screenX = edgeScreenX + (dx / length) * outwardOffset;
+          const screenY = edgeScreenY + (dy / length) * outwardOffset;
+
           return {
             chunk,
             edge,
@@ -461,10 +469,10 @@ export class WebTrainScene extends Phaser.Scene {
             y: screenY,
             rotation: (Math.atan2(dy, dx) * 180) / Math.PI,
             visible:
-              screenX > 26 &&
-              screenX < camera.width - 26 &&
-              screenY > 26 &&
-              screenY < camera.height - 26,
+              screenX > 24 &&
+              screenX < camera.width - 24 &&
+              screenY > 24 &&
+              screenY < camera.height - 24,
           };
         },
       );
