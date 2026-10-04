@@ -219,10 +219,10 @@ function renderStation() {
   $<HTMLButtonElement>("dwell-minus").disabled = info.dwell <= 1;
   $<HTMLButtonElement>("dwell-plus").disabled = info.dwell >= MAX_DWELL;
   $("station-status").textContent = info.closed
-    ? "Kapalı · Trenler durmadan geçer."
+    ? ""
     : info.waiting
-      ? `Tren istasyonda · ${info.remaining} sn sonra kalkacak`
-      : `Açık · Trenler ${info.dwell} sn bekler.`;
+      ? `${info.remaining} sn`
+      : `Trenler ${info.dwell} sn bekler`;
   $("station-status").classList.toggle("waiting", info.waiting);
 }
 function placeStationView() {
