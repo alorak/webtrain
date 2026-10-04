@@ -2843,3 +2843,82 @@ button.game-logo:focus-visible {
     font-size: 32px;
   }
 }
+
+
+/* Compact station panel + top-left view controls */
+.station-panel {
+  top: auto;
+  left: 16px;
+  bottom: 16px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.station-status {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.station-status.waiting {
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+
+.station-row {
+  gap: 10px;
+  margin-top: 10px;
+  padding: 7px 8px 7px 11px;
+}
+
+.station-row .stepper {
+  flex: 0 0 auto;
+  gap: 5px;
+}
+
+.station-dwell-value {
+  display: none;
+}
+
+.station-row .stepper button {
+  width: 32px;
+  height: 30px;
+}
+
+.view-tools {
+  top: 64px;
+  left: 16px;
+  bottom: auto;
+}
+
+@media (max-width: 759px) {
+  .station-panel {
+    top: auto;
+    left: 10px;
+    bottom: 10px;
+    width: min(300px, calc(100vw - 20px));
+    max-height: calc(100vh - 20px);
+  }
+
+  .view-tools {
+    top: 53px;
+    left: 10px;
+    bottom: auto;
+  }
+}
+
+@media (max-height: 550px) and (min-width: 760px) {
+  .station-panel {
+    top: auto;
+    bottom: 10px;
+    max-height: calc(100vh - 20px);
+  }
+
+  .view-tools {
+    top: 56px;
+    bottom: auto;
+  }
+}
