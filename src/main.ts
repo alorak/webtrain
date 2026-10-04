@@ -9,6 +9,7 @@ const paths: Record<string, string> = {
   track: '<path d="m7 3-3 18M17 3l3 18M6 7h12M5 12h14M4 18h16"/>',
   tree: '<path d="m12 2-7 9h3l-5 7h18l-5-7h3L12 2ZM12 18v4"/>',
   house: '<path d="M3 11 12 3l9 8v10h-6v-6H9v6H3Z"/>',
+  park: '<path d="m12 3 2.2 4.7 5.1.6-3.8 3.6 1 5.1-4.5-2.5L7.5 17l1-5.1-3.8-3.6 5.1-.6Z"/>',
   help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 4 2c-1 .6-1.5 1-1.5 2M12 17h.01"/>',
   undo: '<path d="M8 4 3 9l5 5M3 9h11a6 6 0 0 1 0 12"/>',
   redo: '<path d="m16 4 5 5-5 5M21 9H10a6 6 0 0 0 0 12"/>',
@@ -39,24 +40,50 @@ const $ = <T extends HTMLElement = HTMLElement>(id: string) =>
 const items: {
   kind: DecorationKind;
   name: string;
-  category: "nature" | "buildings";
+  category: "nature" | "buildings" | "park" | "train";
   color: string;
 }[] = [
   { kind: "tree", name: "Ağaç", category: "nature", color: "sage" },
   { kind: "pine", name: "Çam", category: "nature", color: "sage" },
-  { kind: "pond", name: "Havuz", category: "nature", color: "blue" },
+  { kind: "treeSmall", name: "Küçük ağaç", category: "nature", color: "sage" },
+  { kind: "blossom", name: "Çiçekli ağaç", category: "nature", color: "peach" },
+  { kind: "flowers", name: "Çiçekler", category: "nature", color: "peach" },
+  { kind: "pond", name: "Gölet", category: "nature", color: "blue" },
+  { kind: "water", name: "Su", category: "nature", color: "blue" },
   { kind: "waterfall", name: "Şelale", category: "nature", color: "blue" },
+  { kind: "fountain", name: "Fıskiye", category: "nature", color: "blue" },
   { kind: "mountain", name: "Dağ", category: "nature", color: "stone" },
+  { kind: "mountainSnow", name: "Karlı dağ", category: "nature", color: "stone" },
   { kind: "duck", name: "Ördekler", category: "nature", color: "sun" },
   { kind: "cow", name: "İnek", category: "nature", color: "sand" },
   { kind: "sheep", name: "Koyun", category: "nature", color: "sand" },
+  { kind: "chicken", name: "Tavuklar", category: "nature", color: "sun" },
 
   { kind: "house", name: "Ev", category: "buildings", color: "peach" },
+  { kind: "houseBlue", name: "Mavi çatılı ev", category: "buildings", color: "blue" },
+  { kind: "houseRed", name: "Kırmızı çatılı ev", category: "buildings", color: "peach" },
+  { kind: "cottage", name: "Küçük ev", category: "buildings", color: "sand" },
+  { kind: "farmhouse", name: "Çiftlik evi", category: "buildings", color: "sand" },
   { kind: "tent", name: "Çadır", category: "buildings", color: "blue" },
   { kind: "windmill", name: "Yel değirmeni", category: "buildings", color: "sand" },
-  { kind: "ferris", name: "Dönme dolap", category: "buildings", color: "peach" },
-  { kind: "balloon", name: "Balon", category: "buildings", color: "sun" },
+  { kind: "carousel", name: "Atlı karınca", category: "buildings", color: "sun" },
+
+  { kind: "balloon", name: "Balon", category: "park", color: "sun" },
+  { kind: "ferris", name: "Dönme dolap", category: "park", color: "peach" },
+  { kind: "cake", name: "Pasta", category: "park", color: "peach" },
+  { kind: "circus", name: "Eğlence çadırı", category: "park", color: "sun" },
+  { kind: "icecream", name: "Dondurmacı", category: "park", color: "blue" },
+  { kind: "funhouse", name: "Eğlence evi", category: "park", color: "peach" },
+  { kind: "gift", name: "Hediye kutusu", category: "park", color: "sun" },
+  { kind: "playground", name: "Oyun alanı", category: "park", color: "sage" },
+
+  { kind: "stationSmall", name: "Küçük istasyon", category: "train", color: "sand" },
+  { kind: "stationLarge", name: "Büyük istasyon", category: "train", color: "blue" },
+  { kind: "stationCountry", name: "Kır istasyonu", category: "train", color: "peach" },
+  { kind: "tunnelStone", name: "Taş tünel", category: "train", color: "stone" },
+  { kind: "tunnelGreen", name: "Yeşil tünel", category: "train", color: "sage" },
 ];
+
 $("decoration-grid").innerHTML = items
   .map((item) => {
     const hidden = item.category === "nature" ? "" : " hidden";
@@ -78,26 +105,24 @@ const game = new Phaser.Game({
   scene: [WebTrainScene],
 });
 let scene: WebTrainScene;
-let lastDecoration: DecorationKind = "tree";
-type SidePanel = "nature" | "buildings" | "track" | "train";
-let activePanel: SidePanel = "nature";
+type SidePanel = "nature" | "buildings" | "park" | "track" | "train";
+let activePanel: SidePanel | null = "nature";
 
-function showPanel(panel: SidePanel) {
+function setPanel(panel: SidePanel | null) {
   activePanel = panel;
-  const category =
-    panel === "nature" ? "nature" : panel === "buildings" ? "buildings" : null;
   const grid = $("decoration-grid");
+  const category =
+    panel === "nature" ||
+    panel === "buildings" ||
+    panel === "park" ||
+    panel === "train"
+      ? panel
+      : null;
+
   grid.hidden = category === null;
-
-  const visibleCards: HTMLButtonElement[] = [];
   grid.querySelectorAll<HTMLButtonElement>("[data-group]").forEach((button) => {
-    button.classList.remove("wide");
     button.hidden = category === null || button.dataset.group !== category;
-    if (!button.hidden) visibleCards.push(button);
   });
-
-  // Two columns fill the panel; an odd final card spans the full width.
-  if (visibleCards.length % 2 === 1) visibleCards.at(-1)?.classList.add("wide");
 
   document.querySelectorAll<HTMLButtonElement>("[data-panel]").forEach((button) => {
     const active = button.dataset.panel === panel;
@@ -105,7 +130,12 @@ function showPanel(panel: SidePanel) {
     button.setAttribute("aria-pressed", String(active));
   });
 }
-showPanel("nature");
+
+function togglePanel(panel: SidePanel) {
+  setPanel(activePanel === panel ? null : panel);
+}
+setPanel("nature");
+
 let speed = 1;
 let toastTimer: ReturnType<typeof setTimeout>;
 function toast(message: string) {
@@ -247,22 +277,33 @@ const bind = (id: string, fn: () => void) =>
   $(id).addEventListener("click", () => {
     if (scene) fn();
   });
+
 bind("panel-nature", () => {
-  showPanel("nature");
+  const closing = activePanel === "nature";
+  togglePanel("nature");
   scene.setTool("select");
+  if (!closing) scene.setTool("select");
 });
 bind("panel-home", () => {
-  showPanel("buildings");
+  togglePanel("buildings");
+  scene.setTool("select");
+});
+bind("panel-park", () => {
+  togglePanel("park");
   scene.setTool("select");
 });
 bind("track-tool", () => {
-  showPanel("track");
-  scene.setTool("track");
+  if (activePanel === "track") {
+    setPanel(null);
+    scene.setTool("select");
+  } else {
+    setPanel("track");
+    scene.setTool("track");
+  }
 });
 bind("train-tool", () => {
-  showPanel("train");
+  togglePanel("train");
   scene.setTool("select");
-  scene.setPlaying();
 });
 bind("play", () => scene.setPlaying());
 bind("speed", () => {
@@ -278,6 +319,7 @@ bind("delete-selected", () => scene.deleteSelectedDecoration());
 bind("home", () => scene.home());
 bind("zoom-in", () => scene.zoom(1.15));
 bind("zoom-out", () => scene.zoom(1 / 1.15));
+
 document
   .querySelectorAll<HTMLButtonElement>("[data-turn]")
   .forEach((button) => {
@@ -288,13 +330,11 @@ document
     button.onfocus = () => scene?.previewTurn(turn);
     button.onblur = () => scene?.previewTurn(null);
   });
+
 document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
   (button) =>
     (button.onclick = () => {
       const kind = button.dataset.kind as DecorationKind;
-      const panel = button.dataset.group as "nature" | "buildings";
-      lastDecoration = kind;
-      showPanel(panel);
       scene?.setTool(kind);
     }),
 );
