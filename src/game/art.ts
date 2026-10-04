@@ -78,44 +78,105 @@ export function roadTile(
   kind: "roadAsphalt" | "roadDirt",
   connected: boolean[],
 ) {
-  // Roads behave like water tiles: placement is not directional. Each click
-  // paints one isometric cell and neighbouring cells of the same road kind
-  // visually merge by removing the shared boundary.
-  const top = { x: 0, y: -24 };
-  const right = { x: 48, y: 0 };
-  const bottom = { x: 0, y: 24 };
-  const left = { x: -48, y: 0 };
+  // Road placement is tile based like water, but the road itself is inset
+  // from the grass. Connected neighbours grow a short bridge to the shared
+  // edge so adjacent tiles still read as one continuous road.
   const asphalt = kind === "roadAsphalt";
-
   const surface = asphalt ? 0x7f8d8a : 0xb17a43;
   const edge = asphalt ? 0x66736f : 0x986437;
   const highlight = asphalt ? 0xa6b2ae : 0xcf9b62;
 
-  poly(g, surface, [0, -24, 48, 0, 0, 24, -48, 0]);
-
-  const edges = [
-    [right, bottom],
-    [bottom, left],
-    [left, top],
-    [top, right],
+  const inner = [
+    { x: 0, y: -16 },
+    { x: 32, y: 0 },
+    { x: 0, y: 16 },
+    { x: -32, y: 0 },
   ] as const;
 
-  g.lineStyle(2, edge, 0.82);
-  edges.forEach(([a, b], heading) => {
-    if (!connected[heading]) g.lineBetween(a.x, a.y, b.x, b.y);
+  const outer = [
+    { x: 0, y: -24 },
+    { x: 48, y: 0 },
+    { x: 0, y: 24 },
+    { x: -48, y: 0 },
+  ] as const;
+
+  const edgeCorners = [
+    [1, 2],
+    [2, 3],
+    [3, 0],
+    [0, 1],
+  ] as const;
+
+  const lerpPoint = (
+    a: { x: number; y: number },
+    b: { x: number; y: number },
+    t: number,
+  ) => ({
+    x: Phaser.Math.Linear(a.x, b.x, t),
+    y: Phaser.Math.Linear(a.y, b.y, t),
   });
 
-  // Light, non-directional material texture. No lane stripe is drawn, so an
-  // isolated tile never implies a road direction.
+  poly(
+    g,
+    surface,
+    inner.flatMap((point) => [point.x, point.y]),
+  );
+
+  const connectorSides: Array<
+    [
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+      { x: number; y: number },
+    ]
+  > = [];
+
+  edgeCorners.forEach(([aIndex, bIndex], heading) => {
+    if (!connected[heading]) return;
+
+    const innerA = inner[aIndex];
+    const innerB = inner[bIndex];
+    const outerA = lerpPoint(outer[aIndex], outer[bIndex], 0.28);
+    const outerB = lerpPoint(outer[aIndex], outer[bIndex], 0.72);
+
+    poly(g, surface, [
+      innerA.x,
+      innerA.y,
+      innerB.x,
+      innerB.y,
+      outerB.x,
+      outerB.y,
+      outerA.x,
+      outerA.y,
+    ]);
+
+    connectorSides.push([innerA, outerA, innerB, outerB]);
+  });
+
+  g.lineStyle(2, edge, 0.78);
+  edgeCorners.forEach(([aIndex, bIndex], heading) => {
+    if (!connected[heading]) {
+      const a = inner[aIndex];
+      const b = inner[bIndex];
+      g.lineBetween(a.x, a.y, b.x, b.y);
+    }
+  });
+
+  for (const [innerA, outerA, innerB, outerB] of connectorSides) {
+    g.lineBetween(innerA.x, innerA.y, outerA.x, outerA.y);
+    g.lineBetween(innerB.x, innerB.y, outerB.x, outerB.y);
+  }
+
+  // Subtle, directionless material texture keeps single tiles neutral.
   if (asphalt) {
-    ellipse(g, highlight, -18, -5, 5, 3, 0.28);
-    ellipse(g, 0x5f6b68, 13, 6, 4, 2, 0.22);
-    ellipse(g, highlight, 23, -2, 3, 2, 0.2);
+    ellipse(g, highlight, -12, -4, 5, 3, 0.26);
+    ellipse(g, 0x5f6b68, 10, 5, 4, 2, 0.2);
+    ellipse(g, highlight, 17, -1, 3, 2, 0.18);
   } else {
-    ellipse(g, edge, -19, -5, 5, 3, 0.42);
-    ellipse(g, highlight, -2, 7, 6, 3, 0.45);
-    ellipse(g, edge, 18, 2, 4, 2, 0.32);
-    ellipse(g, highlight, 24, -6, 3, 2, 0.38);
+    ellipse(g, edge, -13, -4, 5, 3, 0.4);
+    ellipse(g, highlight, -1, 6, 6, 3, 0.43);
+    ellipse(g, edge, 12, 2, 4, 2, 0.3);
+    ellipse(g, highlight, 18, -5, 3, 2, 0.34);
   }
 }
 
