@@ -72,6 +72,8 @@ const items: {
   { kind: "houseRed", name: "Kırmızı çatılı ev", category: "buildings", color: "peach" },
   { kind: "cottage", name: "Küçük ev", category: "buildings", color: "sand" },
   { kind: "farmhouse", name: "Çiftlik evi", category: "buildings", color: "sand" },
+  { kind: "roadAsphalt", name: "Asfalt yol", category: "buildings", color: "stone" },
+  { kind: "roadDirt", name: "Toprak yol", category: "buildings", color: "sand" },
   { kind: "tent", name: "Çadır", category: "buildings", color: "blue" },
   { kind: "windmill", name: "Yel değirmeni", category: "buildings", color: "sand" },
   { kind: "carousel", name: "Atlı karınca", category: "buildings", color: "sun" },
