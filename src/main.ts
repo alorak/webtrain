@@ -149,7 +149,7 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
       visible &&
       x > 45 &&
       x < right &&
-      y > 115 &&
+      y > 55 &&
       y <
         window.innerHeight -
           (window.innerWidth < 760 ? 140 : window.innerHeight < 550 ? 85 : 112);
@@ -157,8 +157,8 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     const center = Math.max(98, Math.min(right - 92, x));
     el.style.left = `${center}px`;
     el.style.setProperty("--anchor-offset", `${x - center}px`);
-    el.style.top = `${Math.max(200, y)}px`;
-    el.style.setProperty("--anchor-y-offset", `${y - Math.max(200, y)}px`);
+    el.style.top = `${Math.max(88, y)}px`;
+    el.style.setProperty("--anchor-y-offset", `${y - Math.max(88, y)}px`);
     el.querySelector(".endpoint-label")!.textContent = blocked
       ? "YER YOK · SON RAYI SİLİP YÖN DEĞİŞTİR"
       : "YOLUN BURADAN DEVAM ETSİN";
