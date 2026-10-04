@@ -63,10 +63,11 @@
         ></button
         ><span class="divider"></span
         ><button
-          id="reset"
+          id="game-menu"
           class="icon-button"
-          title="Yeni dünya"
-          aria-label="Yeni dünya"
+          title="Oyun: yeni, kaydet, aç, dışa ve içe aktar"
+          aria-label="Oyun menüsü"
+          aria-haspopup="dialog"
           data-icon="new"
         ></button>
       </div>
@@ -320,17 +321,89 @@
           ></button>
         </div>
       </dialog>
-      <dialog id="reset-dialog">
-        <span class="eyebrow">YENİ BİR HİKÂYE</span>
-        <h2>Yeni bir dünya kur?</h2>
-        <p>
-          Harita tek bir başlangıç rayıyla temizlenir. Fikrini değiştirirsen
-          geri alabilirsin.
-        </p>
-        <div class="dialog-actions">
-          <button id="cancel-reset">Vazgeç</button
-          ><button id="confirm-reset" class="primary">Yeni dünya kur</button>
+      <dialog id="game-dialog" class="game-dialog" aria-labelledby="game-title">
+        <button
+          class="dialog-close icon-button"
+          id="close-game"
+          aria-label="Kapat"
+          data-icon="close"
+        ></button>
+        <span class="eyebrow">OYUN</span>
+        <h2 id="game-title">Dünyanı yönet</h2>
+        <div class="game-actions" role="tablist" aria-label="Oyun işlemleri">
+          <button data-game="new" role="tab">
+            <span data-icon="new"></span><strong>Yeni oyun</strong
+            ><small>Boş haritayla başla</small>
+          </button>
+          <button data-game="save" role="tab">
+            <span data-icon="save"></span><strong>Kaydet</strong
+            ><small>Bu tarayıcıya kaydet</small>
+          </button>
+          <button data-game="open" role="tab">
+            <span data-icon="folder"></span><strong>Kayıttan aç</strong
+            ><small>Kayıtlı bir oyun seç</small>
+          </button>
+          <button data-game="export" role="tab">
+            <span data-icon="download"></span><strong>Dışa aktar</strong
+            ><small>JSON dosyası indir</small>
+          </button>
+          <button data-game="import" role="tab">
+            <span data-icon="upload"></span><strong>İçe aktar</strong
+            ><small>JSON dosyası yükle</small>
+          </button>
         </div>
+        <section class="game-panel" data-panel-for="new" hidden>
+          <p>
+            Harita tek bir başlangıç rayıyla temizlenir. Önce kaydetmek
+            istersen “Kaydet”i kullan; fikrini değiştirirsen geri alabilirsin.
+          </p>
+          <div class="dialog-actions">
+            <button id="confirm-new" class="primary">Yeni dünya kur</button>
+          </div>
+        </section>
+        <section class="game-panel" data-panel-for="save" hidden>
+          <label class="field">
+            <span>Kayıt adı</span>
+            <input id="save-name" type="text" maxlength="60" autocomplete="off" />
+          </label>
+          <p class="hint-text">
+            Kayıtlar bu tarayıcıda, oyunun kayıt dizininde saklanır. Aynı adla
+            kaydedersen eski kayıt güncellenir.
+          </p>
+          <div class="dialog-actions">
+            <button id="confirm-save" class="primary">Kaydet</button>
+          </div>
+        </section>
+        <section class="game-panel" data-panel-for="open" hidden>
+          <ul id="save-list" class="save-list"></ul>
+          <p id="save-empty" class="hint-text" hidden>
+            Henüz kayıt yok. “Kaydet” ile ilk kaydını oluştur.
+          </p>
+        </section>
+        <section class="game-panel" data-panel-for="export" hidden>
+          <label class="field">
+            <span>Dosya adı</span>
+            <input id="export-name" type="text" maxlength="60" autocomplete="off" />
+          </label>
+          <p class="hint-text">
+            Dünyan bir JSON dosyası olarak indirilir. Başka bir tarayıcıda
+            “İçe aktar” ile açabilirsin.
+          </p>
+          <div class="dialog-actions">
+            <button id="confirm-export" class="primary">Dosyayı indir</button>
+          </div>
+        </section>
+        <section class="game-panel" data-panel-for="import" hidden>
+          <p class="hint-text">
+            Daha önce dışa aktardığın bir WebTrain JSON dosyasını seç. Mevcut
+            dünyanın yerini alır; geri alabilirsin.
+          </p>
+          <div class="dialog-actions">
+            <button id="choose-import" class="primary">Dosya seç</button>
+          </div>
+          <input id="import-file" type="file" accept="application/json,.json" hidden />
+        </section>
+        <p id="game-status" class="game-status" role="status" aria-live="polite"></p>
       </dialog>
     </main>
     <script type="module" src="/src/main.ts"></script>

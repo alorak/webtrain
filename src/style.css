@@ -2409,3 +2409,151 @@ kbd {
     bottom: 12px;
   }
 }
+
+
+/* Game menu: new, save, open, export and import */
+.game-dialog {
+  max-width: 760px;
+  width: calc(100% - 32px);
+  padding: 30px 32px 26px;
+}
+.game-dialog .dialog-close {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+}
+.game-actions {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 18px;
+}
+.game-actions button {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 16px 8px 14px;
+  border-radius: 18px;
+  background: #f1f3e6;
+  border: 2px solid transparent;
+  color: #3d5a45;
+  text-align: center;
+}
+.game-actions button:hover {
+  background: #e7eed8;
+}
+.game-actions button.active {
+  background: #e3ecd6;
+  border-color: #3f7456;
+}
+.game-actions svg {
+  width: 30px;
+  height: 30px;
+  stroke-width: 1.9;
+}
+.game-actions strong {
+  font-size: 13px;
+}
+.game-actions small {
+  font-size: 10px;
+  color: #7a8a6e;
+  line-height: 1.3;
+}
+.game-panel {
+  margin-top: 18px;
+  padding: 18px;
+  border-radius: 16px;
+  background: #f6f6ec;
+}
+.game-panel .dialog-actions {
+  margin-top: 14px;
+}
+.game-panel p {
+  margin: 0;
+}
+.field {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 650;
+  color: #52634b;
+}
+.field input {
+  font: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1.5px solid #d6dcc6;
+  background: #fffef8;
+  color: #3d5a45;
+}
+.field input:focus {
+  outline: 3px solid #3f745633;
+  border-color: #3f7456;
+}
+.hint-text {
+  margin-top: 10px !important;
+  font-size: 12px;
+  color: #74826a;
+}
+.save-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+.save-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 13px;
+  background: #fffef8;
+  border: 1px solid #e6e9da;
+}
+.save-list li > div {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+.save-list strong {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.save-list span {
+  font-size: 11px;
+  color: #7a8a6e;
+}
+.save-list .primary {
+  padding: 9px 16px;
+}
+.save-list .icon-button {
+  color: #b97a54;
+}
+.game-status {
+  min-height: 1em;
+  margin: 12px 0 0 !important;
+  font-size: 12px;
+  color: #3f7456;
+}
+.game-status.error {
+  color: #b5533f;
+}
+@media (max-width: 759px) {
+  .game-dialog {
+    padding: 24px 18px 20px;
+  }
+  .game-actions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .game-actions button:last-child {
+    grid-column: 1 / -1;
+  }
+}
