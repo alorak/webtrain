@@ -427,8 +427,13 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     const onMap = (x: number, y: number) =>
       x > 18 && x < right - 18 && y > 18 && y < window.innerHeight - 18;
     const place = (el: HTMLElement, x: number, y: number) => {
-      el.style.left = `${Phaser.Math.Clamp(x, safe, Math.max(safe, right - safe))}px`;
-      el.style.top = `${Phaser.Math.Clamp(y, safe, Math.max(safe, window.innerHeight - safe))}px`;
+      const placed = {
+        x: Phaser.Math.Clamp(x, safe, Math.max(safe, right - safe)),
+        y: Phaser.Math.Clamp(y, safe, Math.max(safe, window.innerHeight - safe)),
+      };
+      el.style.left = `${placed.x}px`;
+      el.style.top = `${placed.y}px`;
+      return placed;
     };
     const angle = (v: { x: number; y: number }) => (Math.atan2(v.y, v.x) * 180) / Math.PI;
 
@@ -437,19 +442,23 @@ game.events.once("world-ready", (ready: WebTrainScene) => {
     const end = controls.end;
     actions.hidden = !end || !onMap(end.x, end.y);
     if (end && !actions.hidden) {
-      place(actions, end.x, end.y);
+      const anchor = place(actions, end.x, end.y);
       const forward = screenVector(end.heading);
       actions.querySelectorAll<HTMLButtonElement>("[data-turn]").forEach((button) => {
         const turn = Number(button.dataset.turn) as Turn;
         const direction = screenVector(end.heading + turn);
-        // Each SVG has a different native arrow-head direction.
+        const target = end.targets[turn + 1];
+        // Each SVG has a different native arrow-head direction. Position is
+        // no longer an arbitrary radius: it is the actual far-edge midpoint
+        // of the next grid cell for that left/straight/right choice.
         const nativeAngle = turn === -1 ? 180 : turn === 0 ? -90 : 0;
-        button.style.setProperty("--turn-x", `${direction.x * radius}px`);
-        button.style.setProperty("--turn-y", `${direction.y * radius}px`);
+        button.style.setProperty("--turn-x", `${target.x - anchor.x}px`);
+        button.style.setProperty("--turn-y", `${target.y - anchor.y}px`);
         button.style.setProperty("--turn-rotation", `${angle(direction) - nativeAngle}deg`);
         button.disabled = !end.can[turn + 1];
       });
-      // Delete sits behind the endpoint, away from all three possible new tracks.
+      // Delete stays behind the current endpoint, separate from the three
+      // future-edge choices.
       const remove = $<HTMLButtonElement>("remove-track");
       remove.hidden = !end.remove;
       remove.style.setProperty("--delete-x", `${-forward.x * radius * 0.82}px`);
