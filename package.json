@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node --experimental-strip-types --test tests/*.test.ts"
   },
   "dependencies": {
     "phaser": "^3.90.0"
@@ -14,5 +15,8 @@
   "devDependencies": {
     "typescript": "^5.6.3",
     "vite": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=22.6.0"
   }
 }

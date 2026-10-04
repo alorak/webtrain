@@ -2,31 +2,239 @@
 <html lang="tr">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
-    <meta name="theme-color" content="#80c942" />
-    <title>WebTrain MVP</title>
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#a9c986" />
+    <meta
+      name="description"
+      content="Küçük bir dünya, kocaman hayaller. Raylarını döşe, dünyanı süsle ve trenini yola çıkar. Ücretsiz, tarayıcıda çalışan bir tren oyunu."
+    />
+    <title>WebTrain — Küçük bir dünya kur</title>
   </head>
   <body>
     <main id="app">
-      <div id="game-root" aria-label="İzometrik tren yolu oyun alanı"></div>
-
-      <section class="hud hud--top" aria-live="polite">
-        <strong>WebTrain</strong>
-        <span>Dokun: ray ekle · Sürükle: haritayı taşı · İki parmak: yakınlaştır</span>
-      </section>
-
-      <nav class="toolbar" aria-label="Ray araçları">
-        <button id="track-tool" class="tool-button tool-button--active" type="button">
-          <span class="tool-button__icon">━</span>
-          <span>Düz ray</span>
+      <div
+        id="game-root"
+        role="application"
+        aria-label="Tren dünyası. Haritayı sürükleyerek taşıyabilir, son rayı seçerek yolu uzatabilirsin."
+      ></div>
+      <header class="topbar">
+        <a class="brand" href="./" aria-label="WebTrain ana sayfa"
+          ><span class="brand-mark" data-icon="train"></span
+          ><span
+            >web<span class="brand-light">train</span
+            ><small>KÜÇÜK BİR DÜNYA KUR</small></span
+          ></a
+        >
+        <div class="world-title">
+          <span class="status-dot"></span> Benim küçük dünyam
+          <span class="title-divider"></span
+          ><span id="save-status">Kaydedildi</span>
+        </div>
+        <button
+          id="help-button"
+          class="icon-button"
+          title="Nasıl oynanır?"
+          aria-label="Nasıl oynanır?"
+          data-icon="help"
+        ></button>
+      </header>
+      <div class="world-caption">
+        <span class="eyebrow">HAYAL ET. İNŞA ET. KEŞFET.</span>
+        <h1>Bir yol, bin hikâye.</h1>
+        <p>Bir sonraki durak hayal gücün.</p>
+      </div>
+      <div class="history-tools floating">
+        <button
+          id="undo"
+          class="icon-button"
+          title="Geri al (Ctrl/⌘ Z)"
+          aria-label="Geri al"
+          data-icon="undo"
+        ></button
+        ><button
+          id="redo"
+          class="icon-button"
+          title="Yinele (Ctrl/⌘ Shift Z)"
+          aria-label="Yinele"
+          data-icon="redo"
+        ></button
+        ><span class="divider"></span
+        ><button
+          id="reset"
+          class="icon-button"
+          title="Yeni dünya"
+          aria-label="Yeni dünya"
+          data-icon="new"
+        ></button>
+      </div>
+      <aside class="library" aria-label="Dünya oluşturma araçları">
+        <div class="library-heading">
+          <div>
+            <span class="eyebrow">BİRAZ HAYAL GÜCÜ</span>
+            <h2>Dünyana ekle<span>.</span></h2>
+          </div>
+          <span class="heading-star">✳</span>
+        </div>
+        <div class="mode-switch">
+          <button id="track-tool" class="active" aria-pressed="true">
+            <span data-icon="track"></span> Ray döşe</button
+          ><button id="decor-mode" aria-pressed="false">
+            <span data-icon="tree"></span> Dekor ekle
+          </button>
+        </div>
+        <div class="section-label">KÜÇÜK ŞEYLER, BÜYÜK HİKÂYELER</div>
+        <div class="categories" role="group" aria-label="Dekor kategorisi">
+          <button class="active" data-category="all" aria-pressed="true">
+            Tümü</button
+          ><button data-category="nature" aria-pressed="false">Doğa</button
+          ><button data-category="buildings" aria-pressed="false">
+            Yapılar</button
+          ><button data-category="fun" aria-pressed="false">Eğlence</button>
+        </div>
+        <div id="decoration-grid" class="decoration-grid"></div>
+        <div class="library-bottom">
+          <button id="erase-tool" aria-pressed="false">
+            <span data-icon="erase"></span> Silgi</button
+          ><span>Seç, sonra haritaya dokun.</span>
+        </div>
+      </aside>
+      <div
+        id="track-actions"
+        class="track-actions"
+        role="group"
+        aria-label="Son rayı uzat"
+      >
+        <span class="endpoint-label">YOLUN BURADAN DEVAM ETSİN</span>
+        <div class="direction-buttons">
+          <button
+            data-turn="-1"
+            title="Sola dön"
+            aria-label="Sola ray ekle"
+            data-icon="left"
+          ></button
+          ><button
+            data-turn="0"
+            title="İleri git"
+            aria-label="İleri ray ekle"
+            data-icon="forward"
+          ></button
+          ><button
+            data-turn="1"
+            title="Sağa dön"
+            aria-label="Sağa ray ekle"
+            data-icon="right"
+          ></button>
+        </div>
+        <button
+          id="remove-track"
+          class="remove-track"
+          title="Son rayı sil"
+          aria-label="Son rayı sil"
+          data-icon="trash"
+        ></button>
+      </div>
+      <div class="view-tools floating">
+        <button
+          id="zoom-in"
+          class="icon-button"
+          aria-label="Yakınlaştır"
+          title="Yakınlaştır"
+          data-icon="plus"
+        ></button
+        ><span id="zoom-label">100%</span
+        ><button
+          id="zoom-out"
+          class="icon-button"
+          aria-label="Uzaklaştır"
+          title="Uzaklaştır"
+          data-icon="minus"
+        ></button
+        ><span class="horizontal-divider"></span
+        ><button
+          id="home"
+          class="icon-button"
+          aria-label="Haritayı ortala"
+          title="Haritayı ortala"
+          data-icon="focus"
+        ></button>
+      </div>
+      <div class="bottom-bar">
+        <div class="hint">
+          <span class="hint-icon" data-icon="pointer"></span
+          ><span id="tool-hint"
+            ><strong>Rayın ucuna dokun.</strong><br />Bir yön seç, yolculuğu
+            uzat.</span
+          >
+        </div>
+        <div class="train-controls">
+          <button id="play">
+            <span data-icon="play"></span
+            ><span id="play-label">Treni çalıştır</span></button
+          ><button id="speed" title="Tren hızı" aria-label="Tren hızı: 1 kat">
+            1×
+          </button>
+        </div>
+        <div class="world-stats">
+          <span><strong id="track-count">0</strong> ray</span
+          ><span class="stat-dot">·</span
+          ><span><strong id="decor-count">0</strong> dekor</span>
+        </div>
+      </div>
+      <div class="map-note">
+        <span data-icon="hand"></span> Sürükle, dünyayı keşfet
+        <span>·</span> Kaydır, yakınlaş
+      </div>
+      <div id="toast" role="status" aria-live="polite"></div>
+      <dialog id="help-dialog">
+        <button
+          class="dialog-close icon-button"
+          aria-label="Kapat"
+          data-icon="close"
+        ></button
+        ><span class="eyebrow">DÜNYANA HOŞ GELDİN</span>
+        <h2>Küçük adımlarla,<br />kocaman bir dünya.</h2>
+        <ol>
+          <li>
+            <strong>Yolunu çiz.</strong> Son raya dokun; sola, ileri veya sağa
+            ekle. Rayın yanındaki çöp kutusuyla son parçayı kaldır.
+          </li>
+          <li>
+            <strong>Hayal gücünü yerleştir.</strong> Sağdan bir dekor seç, boş
+            bir kareye dokun. Silgiyle dekorları kaldırabilirsin.
+          </li>
+          <li>
+            <strong>Yolculuk başlasın.</strong> Treni çalıştır. Açık rotada
+            gidip gelir, kapalı rotada turlar.
+          </li>
+        </ol>
+        <p>
+          Haritayı sürükle. Tekerlekle veya iki parmakla yakınlaş.
+          Değişikliklerin bu tarayıcıda otomatik saklanır.
+        </p>
+        <p class="keyboard-help">
+          Kısayollar: <kbd>1</kbd> ray · <kbd>2</kbd> dekor · <kbd>E</kbd> silgi
+          · <kbd>Space</kbd> tren · <kbd>⌘/Ctrl Z</kbd> geri al
+        </p>
+        <button class="primary dialog-done">
+          Hadi başlayalım <span>↗</span>
         </button>
-        <button id="track-direction" class="tool-button" type="button">
-          <span class="tool-button__icon">↻</span>
-          <span>Yön: ↘</span>
-        </button>
-      </nav>
+      </dialog>
+      <dialog id="reset-dialog">
+        <span class="eyebrow">YENİ BİR HİKÂYE</span>
+        <h2>Yeni bir dünya kur?</h2>
+        <p>
+          Harita tek bir başlangıç rayıyla temizlenir. Fikrini değiştirirsen
+          geri alabilirsin.
+        </p>
+        <div class="dialog-actions">
+          <button id="cancel-reset">Vazgeç</button
+          ><button id="confirm-reset" class="primary">Yeni dünya kur</button>
+        </div>
+      </dialog>
     </main>
-
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
