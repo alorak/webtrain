@@ -280,7 +280,7 @@ export class WebTrainScene extends Phaser.Scene {
       const isOverlay = isTrackOverlayKind(d.kind);
       const g = this.add
         .graphics({ x: p.x, y: p.y })
-        .setDepth((isWater ? 0.5 : isOverlay ? 13 : 10) + p.y);
+        .setDepth(isWater ? 0.5 : (isOverlay ? 13 : 10) + p.y);
 
       if (isWater) {
         const connected = [
