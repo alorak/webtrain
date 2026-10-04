@@ -137,6 +137,8 @@ const items: {
   { kind: "stationCountry", name: "Kır istasyonu", category: "train", color: "peach" },
   { kind: "tunnelStone", name: "Taş tünel", category: "train", color: "stone" },
   { kind: "tunnelGreen", name: "Yeşil tünel", category: "train", color: "sage" },
+  { kind: "levelCrossing", name: "Hemzemin geçit", category: "train", color: "sand" },
+  { kind: "bufferStop", name: "Tampon", category: "train", color: "peach" },
 ];
 
 $("decoration-grid").innerHTML = items
