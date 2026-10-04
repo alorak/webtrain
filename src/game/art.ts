@@ -1,7 +1,8 @@
 import Phaser from "phaser";
 import {
+  CHUNK_SIZE,
   sampleTrack,
-  SIZE,
+  type Chunk,
   type DecorationKind,
   type Point,
   type Track,
@@ -72,31 +73,38 @@ export function waterTile(g: G, connected: boolean[]) {
   g.lineStyle(1.5, 0xdaf3ee, 0.5).lineBetween(8, 7, 25, 7);
 }
 
-export function ground(g: G) {
-  for (let y = 0; y < SIZE; y++)
-    for (let x = 0; x < SIZE; x++) {
-      const p = project({ x, y });
-      g.save().translateCanvas(p.x, p.y);
-      diamond(g, (x + y) % 2 ? 0xaacb85 : 0xaece89);
-      g.lineStyle(1, 0xd5e6b7, 0.24).strokePoints(
-        [
-          { x: 0, y: -24 },
-          { x: 48, y: 0 },
-          { x: 0, y: 24 },
-          { x: -48, y: 0 },
-        ],
-        true,
-      );
-      if ((x * 7 + y * 13) % 11 === 0) {
-        line(g, 0x8fb570, 1.5, 14, 1, 12, -3);
-        line(g, 0x8fb570, 1.5, 14, 1, 17, -2);
+export function ground(g: G, chunks: Chunk[]) {
+  g.clear();
+  for (const chunk of chunks) {
+    const startX = chunk.x * CHUNK_SIZE;
+    const startY = chunk.y * CHUNK_SIZE;
+    for (let localY = 0; localY < CHUNK_SIZE; localY += 1)
+      for (let localX = 0; localX < CHUNK_SIZE; localX += 1) {
+        const x = startX + localX;
+        const y = startY + localY;
+        const p = project({ x, y });
+        g.save().translateCanvas(p.x, p.y);
+        diamond(g, (x + y) % 2 ? 0xaacb85 : 0xaece89);
+        g.lineStyle(1, 0xd5e6b7, 0.24).strokePoints(
+          [
+            { x: 0, y: -24 },
+            { x: 48, y: 0 },
+            { x: 0, y: 24 },
+            { x: -48, y: 0 },
+          ],
+          true,
+        );
+        if ((Math.abs(x * 7 + y * 13) % 11) === 0) {
+          line(g, 0x8fb570, 1.5, 14, 1, 12, -3);
+          line(g, 0x8fb570, 1.5, 14, 1, 17, -2);
+        }
+        if ((Math.abs(x * 13 + y * 7) % 37) === 0) {
+          ellipse(g, 0xf8edb5, -12, 3, 3, 2);
+          ellipse(g, 0xffffff, -8, 6, 3, 2);
+        }
+        g.restore();
       }
-      if ((x * 13 + y * 7) % 37 === 0) {
-        ellipse(g, 0xf8edb5, -12, 3, 3, 2);
-        ellipse(g, 0xffffff, -8, 6, 3, 2);
-      }
-      g.restore();
-    }
+  }
 }
 export function drawTrack(g: G, track: Track, alpha = 1) {
   const points = Array.from({ length: 25 }, (_, i) =>
