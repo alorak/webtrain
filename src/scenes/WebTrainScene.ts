@@ -29,6 +29,10 @@ import {
   placeDecoration,
   removableTrack,
   removeTrack,
+  setStation,
+  stationAt,
+  stationDwell,
+  stationStop,
   doorsOnRoad,
   roadAtEntrance,
   roadNeighbours,
@@ -120,10 +124,19 @@ export class WebTrainScene extends Phaser.Scene {
   private trainTrack: Track | null = null;
   // Pieces the train just left, so its wagon follows it through switches.
   private trail: Track[] = [];
+  // A train held at a station: where, and until when (scene time, ms).
+  private dwellCell: Point | null = null;
+  private dwellUntil = 0;
+  private selectedStation: Point | null = null;
+  // A second camera draws the selected station on the game canvas, under
+  // the info panel; after each frame that area is copied into the panel.
+  private stationCamera: Phaser.Cameras.Scene2D.Camera | null = null;
+  private stationCanvas: HTMLCanvasElement | null = null;
   private speed = 1;
   onChange?: (status: GameStatus) => void;
   onMessage?: (message: string) => void;
   onRailControls?: (controls: RailControls) => void;
+  onStation?: (cell: Point | null) => void;
   onDecorationAnchor?: (x: number, y: number, visible: boolean) => void;
   onExpansionAnchors?: (anchors: ExpansionAnchor[]) => void;
 
@@ -152,6 +165,7 @@ export class WebTrainScene extends Phaser.Scene {
     this.events.once("shutdown", () =>
       this.scale.off("resize", this.resize, this),
     );
+    this.game.events.on("postrender", this.copyStationView, this);
     this.game.events.emit("world-ready", this);
   }
   private resize() {
@@ -458,6 +472,81 @@ export class WebTrainScene extends Phaser.Scene {
       .lineBetween(first.x - 7, first.y - 14, first.x + 7, first.y - 7);
   }
   // Keeps the train on the same piece across edits, or restarts it.
+  private copyStationView() {
+    const camera = this.stationCamera;
+    const target = this.stationCanvas;
+    if (!camera || !target) return;
+    const source = this.game.canvas;
+    const ratio = source.width / (source.clientWidth || source.width);
+    const width = Math.round(camera.width * ratio);
+    const height = Math.round(camera.height * ratio);
+    if (target.width !== width || target.height !== height) {
+      target.width = width;
+      target.height = height;
+    }
+    target
+      .getContext("2d")
+      ?.drawImage(source, camera.x * ratio, camera.y * ratio, width, height, 0, 0, width, height);
+  }
+  // Whether the train is still waiting at an open station.
+  private heldAtStation(time: number) {
+    const cell = this.dwellCell;
+    const station = cell && stationAt(this.world, cell);
+    if (station && !station.closed && time < this.dwellUntil) return true;
+    this.dwellCell = null;
+    return false;
+  }
+  // What the station panel shows for a station.
+  stationInfo(cell: Point) {
+    const station = stationAt(this.world, cell);
+    if (!station) return null;
+    const now = this.time.now;
+    const waiting =
+      Boolean(this.dwellCell && same(this.dwellCell, cell)) &&
+      !station.closed &&
+      now < this.dwellUntil;
+    return {
+      kind: station.kind,
+      closed: Boolean(station.closed),
+      dwell: stationDwell(station),
+      waiting,
+      remaining: waiting ? Math.ceil((this.dwellUntil - now) / 1000) : 0,
+    };
+  }
+  selectStation(cell: Point | null) {
+    this.selectedStation = cell ? { x: cell.x, y: cell.y } : null;
+    if (!cell) this.setStationView(null);
+    this.onStation?.(this.selectedStation);
+  }
+  setStationSettings(settings: { closed?: boolean; dwell?: number }) {
+    if (!this.selectedStation) return;
+    this.remember();
+    setStation(this.world, this.selectedStation, settings);
+    this.commit();
+  }
+  // Shows the selected station in the panel's canvas, which sits over the
+  // given screen rectangle.
+  setStationView(
+    rect: { x: number; y: number; width: number; height: number } | null,
+    canvas: HTMLCanvasElement | null = null,
+  ) {
+    if (!rect || !this.selectedStation) {
+      if (this.stationCamera) this.cameras.remove(this.stationCamera);
+      this.stationCamera = null;
+      this.stationCanvas = null;
+      return;
+    }
+    this.stationCanvas = canvas;
+    if (!this.stationCamera) {
+      this.stationCamera = this.cameras.add(rect.x, rect.y, rect.width, rect.height);
+      this.stationCamera.setBackgroundColor(0xa7c882).ignore(this.preview);
+    }
+    const p = project(this.selectedStation);
+    this.stationCamera
+      .setViewport(Math.round(rect.x), Math.round(rect.y), Math.round(rect.width), Math.round(rect.height))
+      .setZoom(1.6)
+      .centerOn(p.x, p.y - 18);
+  }
   private syncTrain() {
     const t = this.trainTrack;
     const index = t
@@ -472,6 +561,8 @@ export class WebTrainScene extends Phaser.Scene {
     this.trail = [];
     if (this.selectedRail && !piecesAt(this.world, this.selectedRail).length)
       this.selectedRail = null;
+    if (this.selectedStation && !stationAt(this.world, this.selectedStation))
+      this.selectStation(null);
   }
   private toScreen(p: Point) {
     const camera = this.cameras.main;
@@ -514,16 +605,24 @@ export class WebTrainScene extends Phaser.Scene {
       };
     return controls;
   }
-  update(_time: number, delta: number) {
+  update(time: number, delta: number) {
     if (!this.train) return;
-    if (this.playing)
-      this.trainState =
+    if (this.playing && !this.heldAtStation(time)) {
+      const before = this.trainState;
+      const after =
         advanceTrain(
           this.world,
-          this.trainState,
+          before,
           (Math.min(delta, 60) / 1000) * this.speed * 1.25,
           { onEnter: (from) => (this.trail = [from, ...this.trail].slice(0, 6)) },
-        ) ?? this.trainState;
+        ) ?? before;
+      const stop = stationStop(this.world, before, after);
+      this.trainState = stop?.state ?? after;
+      if (stop) {
+        this.dwellCell = { x: stop.station.x, y: stop.station.y };
+        this.dwellUntil = time + stationDwell(stop.station) * 1000;
+      }
+    }
     this.trainTrack = this.world.tracks[this.trainState.track];
     const pose = trainPose(this.world, this.trainState);
     this.train.clear();
@@ -740,6 +839,9 @@ export class WebTrainScene extends Phaser.Scene {
   private tap(p: Phaser.Input.Pointer) {
     const cell = this.cellAt(p);
     if (!inside(cell, this.world)) return;
+
+    // Tapping a station opens its info panel, whatever tool is in hand.
+    if (this.tool !== "erase" && stationAt(this.world, cell)) this.selectStation(cell);
 
     const indexOn = (ground: boolean) =>
       this.world.decorations.findIndex(

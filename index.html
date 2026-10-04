@@ -258,6 +258,45 @@
         <span>·</span> Kaydır, yakınlaş
       </div>
       <div id="toast" role="status" aria-live="polite"></div>
+      <section
+        id="station-panel"
+        class="station-panel"
+        aria-labelledby="station-title"
+        hidden
+      >
+        <header>
+          <h2 id="station-title">İstasyon</h2>
+          <button
+            id="close-station"
+            class="icon-button"
+            aria-label="İstasyon penceresini kapat"
+            data-icon="close"
+          ></button>
+        </header>
+        <div class="station-body">
+          <div
+            id="station-view"
+            class="station-view"
+            role="img"
+            aria-label="İstasyonun canlı görüntüsü"
+          >
+            <canvas id="station-canvas"></canvas>
+          </div>
+          <div class="station-lights" role="group" aria-label="İstasyon durumu">
+            <button id="station-open" class="station-light open" title="İstasyonu aç" aria-label="İstasyonu aç"></button>
+            <button id="station-closed" class="station-light closed" title="İstasyonu kapat" aria-label="İstasyonu kapat"></button>
+          </div>
+        </div>
+        <p id="station-status" class="station-status" aria-live="polite"></p>
+        <div id="station-dwell-row" class="station-row">
+          <span>Bekleme süresi</span>
+          <div class="stepper">
+            <button id="dwell-minus" aria-label="Bekleme süresini azalt">−</button
+            ><output id="dwell-value">3 sn</output
+            ><button id="dwell-plus" aria-label="Bekleme süresini artır">+</button>
+          </div>
+        </div>
+      </section>
       <dialog id="help-dialog">
         <button
           class="dialog-close icon-button"

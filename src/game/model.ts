@@ -87,6 +87,10 @@ export interface Track extends Point {
 }
 export interface Decoration extends Point {
   kind: DecorationKind;
+  // Stations only: a closed station lets trains pass, an open one holds
+  // them for dwell seconds. Defaults are left out of saves.
+  closed?: boolean;
+  dwell?: number;
 }
 export interface World {
   version: 1;
@@ -625,6 +629,55 @@ export function advanceTrain(
   return { track: index, forward, t: forward ? u : 1 - u };
 }
 
+// Stations stop trains at the middle of their piece of rail.
+export const stationKinds: DecorationKind[] = ["stationSmall", "stationLarge", "stationCountry"];
+export const isStationKind = (kind: DecorationKind) => stationKinds.includes(kind);
+export const DEFAULT_DWELL = 3;
+export const MAX_DWELL = 30;
+const validDwell = (n: unknown) => Number.isInteger(n) && (n as number) >= 1 && (n as number) <= MAX_DWELL;
+export const stationDwell = (station: Decoration) => station.dwell ?? DEFAULT_DWELL;
+export const stationAt = (world: Pick<World, "decorations">, cell: Point) =>
+  world.decorations.find((d) => isStationKind(d.kind) && same(d, cell));
+
+export function setStation(
+  world: World,
+  cell: Point,
+  { closed, dwell }: { closed?: boolean; dwell?: number },
+): boolean {
+  const station = stationAt(world, cell);
+  if (!station) return false;
+  if (closed !== undefined) {
+    if (closed) station.closed = true;
+    else delete station.closed;
+  }
+  if (dwell !== undefined) {
+    const value = Math.min(MAX_DWELL, Math.max(1, Math.round(dwell)));
+    if (value === DEFAULT_DWELL) delete station.dwell;
+    else station.dwell = value;
+  }
+  return true;
+}
+
+// If a train moving from before to after passes the middle of a piece with
+// an open station, the state to hold it at that middle and the station.
+export function stationStop(
+  world: World,
+  before: TrainState,
+  after: TrainState,
+): { state: TrainState; station: Decoration } | null {
+  const progress = (s: TrainState) => (s.forward ? s.t : 1 - s.t);
+  const check = (s: TrainState, from: number, to: number) => {
+    const station = stationAt(world, world.tracks[s.track]);
+    if (!station || station.closed || !(from < 0.5 && to >= 0.5)) return null;
+    return { state: { ...s, t: 0.5 }, station };
+  };
+  if (before.track === after.track)
+    return before.forward === after.forward
+      ? check(after, progress(before), progress(after))
+      : null;
+  return check(before, progress(before), 1) ?? check(after, 0, progress(after));
+}
+
 export function trainPose(world: World, state: TrainState) {
   const { point, tangent } = sampleTrack(world.tracks[state.track], state.t);
   const sign = state.forward ? 1 : -1;
@@ -736,6 +789,11 @@ export function parseWorld(raw: string | null): World | null {
       if (isGroundLayer(d.kind)) continue;
       const pieces = trackCells.get(cell) ?? 0;
       if (isTrackOverlayKind(d.kind) ? pieces !== 1 : pieces > 0) return null;
+      if (d.closed !== undefined || d.dwell !== undefined) {
+        if (!isStationKind(d.kind)) return null;
+        if (d.closed !== undefined && typeof d.closed !== "boolean") return null;
+        if (d.dwell !== undefined && !validDwell(d.dwell)) return null;
+      }
     }
 
     return data as World;
