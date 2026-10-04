@@ -278,7 +278,26 @@
           ></button>
         </div>
       </dialog>
-            <dialog id="reset-dialog">
+            <dialog id="delete-dialog" aria-labelledby="delete-title">
+        <h2 id="delete-title">Silinecek?</h2>
+        <div class="dialog-actions delete-dialog-actions">
+          <button
+            id="confirm-delete"
+            class="primary delete-confirm"
+            type="button"
+            aria-label="Sil"
+            data-icon="trash"
+          ></button>
+          <button
+            id="cancel-delete"
+            class="delete-cancel"
+            type="button"
+            aria-label="İptal"
+            data-icon="close"
+          ></button>
+        </div>
+      </dialog>
+      <dialog id="reset-dialog">
         <span class="eyebrow">YENİ BİR HİKÂYE</span>
         <h2>Yeni bir dünya kur?</h2>
         <p>
