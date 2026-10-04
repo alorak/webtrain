@@ -4,6 +4,7 @@ import {
   candidate,
   createWorld,
   inside,
+  isTrackOverlayKind,
   nextCell,
   parseWorld,
   placeDecoration,
@@ -24,7 +25,9 @@ import {
   ground,
   locomotive,
   project,
+  trackDecoration,
   unproject,
+  waterTile,
 } from "../game/art";
 
 export interface GameStatus {
@@ -160,7 +163,10 @@ export class WebTrainScene extends Phaser.Scene {
       return;
     }
     this.remember();
-    this.world.tracks.pop();
+    const removed = this.world.tracks.pop()!;
+    this.world.decorations = this.world.decorations.filter(
+      (d) => !(same(d, removed) && isTrackOverlayKind(d.kind)),
+    );
     this.world.closed = false;
     this.selected = true;
     this.commit();
@@ -269,9 +275,31 @@ export class WebTrainScene extends Phaser.Scene {
     for (const track of this.world.tracks) drawTrack(this.rails, track);
     this.scenery.forEach((g) => g.destroy());
     this.scenery = this.world.decorations.map((d) => {
-      const p = project(d),
-        g = this.add.graphics({ x: p.x, y: p.y }).setDepth(10 + p.y);
-      decoration(g, d.kind);
+      const p = project(d);
+      const isWater = d.kind === "water";
+      const isOverlay = isTrackOverlayKind(d.kind);
+      const g = this.add
+        .graphics({ x: p.x, y: p.y })
+        .setDepth(isWater ? 0.5 : (isOverlay ? 13 : 10) + p.y);
+
+      if (isWater) {
+        const connected = [
+          { x: d.x + 1, y: d.y },
+          { x: d.x, y: d.y + 1 },
+          { x: d.x - 1, y: d.y },
+          { x: d.x, y: d.y - 1 },
+        ].map((cell) =>
+          this.world.decorations.some(
+            (other) => other.kind === "water" && same(other, cell),
+          ),
+        );
+        waterTile(g, connected);
+      } else if (isOverlay) {
+        const track = this.world.tracks.find((t) => same(t, d));
+        if (track) trackDecoration(g, d.kind, track);
+      } else {
+        decoration(g, d.kind);
+      }
       return g;
     });
     this.marker.clear();
@@ -431,16 +459,29 @@ export class WebTrainScene extends Phaser.Scene {
     const cell = this.cellAt(p);
     this.preview.clear();
     if (!inside(cell) || this.tool === "track" || this.tool === "select") return;
-    const occupied = [...this.world.tracks, ...this.world.decorations].some(
-      (d) => same(d, cell),
-    );
+
+    const decorationAtCell = this.world.decorations.some((d) => same(d, cell));
+    const trackAtCell = this.world.tracks.find((track) => same(track, cell));
+    const overlay = this.tool !== "erase" && isTrackOverlayKind(this.tool);
+    const canPlace =
+      this.tool === "erase"
+        ? decorationAtCell || Boolean(trackAtCell)
+        : overlay
+          ? Boolean(trackAtCell) && !decorationAtCell
+          : !trackAtCell && !decorationAtCell;
+
     const pos = project(cell);
     this.preview.save().translateCanvas(pos.x, pos.y);
-    diamond(this.preview, occupied ? 0xcf7563 : 0xfff8db, 0.5);
-    if (this.tool !== "erase" && !occupied) {
-      this.preview.setAlpha(0.65);
-      decoration(this.preview, this.tool);
-    } else this.preview.setAlpha(1);
+    diamond(this.preview, canPlace ? 0xfff8db : 0xcf7563, 0.5);
+
+    if (this.tool !== "erase" && canPlace) {
+      this.preview.setAlpha(0.68);
+      if (overlay && trackAtCell) trackDecoration(this.preview, this.tool, trackAtCell);
+      else if (this.tool === "water") waterTile(this.preview, [false, false, false, false]);
+      else decoration(this.preview, this.tool);
+    } else {
+      this.preview.setAlpha(1);
+    }
     this.preview.restore();
   }
   private tap(p: Phaser.Input.Pointer) {
@@ -485,13 +526,20 @@ export class WebTrainScene extends Phaser.Scene {
       return;
     }
 
-    if (this.world.tracks.some((track) => same(track, cell))) {
-      this.onMessage?.("Bu karede ray var. Boş bir kare seç.");
+    const kind = this.tool;
+    const overlay = isTrackOverlayKind(kind);
+    this.remember();
+    const placed = placeDecoration(this.world, cell, kind);
+    if (!placed) {
+      this.history.pop();
+      this.onMessage?.(
+        overlay
+          ? "İstasyon ve tünelleri bir ray parçasının üstüne yerleştir."
+          : "Buraya eklenemiyor. Boş bir kare seç.",
+      );
       return;
     }
 
-    this.remember();
-    placeDecoration(this.world, cell, this.tool);
     // Decoration placement is deliberately one-shot for young players.
     this.tool = "select";
     this.selectedDecorationIndex = null;
