@@ -2557,3 +2557,158 @@ kbd {
     grid-column: 1 / -1;
   }
 }
+
+
+/* Game logo: "Trains" over "alorak games", at the top of the tool column */
+.library-side {
+  order: 2;
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.library-side .tool-rail {
+  margin: auto 10px auto 8px;
+}
+.game-logo {
+  pointer-events: auto;
+  margin-top: 10px;
+  padding: 4px;
+  border-radius: 12px;
+  background: none;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  user-select: none;
+  -webkit-user-select: none;
+  transform-origin: top center;
+  transition: transform 0.18s ease;
+}
+button.game-logo:hover,
+button.game-logo:focus-visible {
+  transform: scale(1.1);
+}
+.logo-title,
+.logo-studio {
+  pointer-events: none;
+}
+/* The same logo, larger, heads the game dialog. */
+.dialog-logo {
+  margin: 0 auto 6px;
+  width: max-content;
+}
+.dialog-logo .logo-title {
+  font-size: 40px;
+}
+.dialog-logo .logo-letter {
+  -webkit-text-stroke-width: 7px;
+  text-shadow:
+    0 4px 0 #2f5a44,
+    0 7px 14px rgb(36 70 48 / 26%);
+}
+.dialog-logo .logo-rails {
+  width: 140px;
+  height: 12px;
+}
+.dialog-logo .logo-studio {
+  font-size: 10px;
+  letter-spacing: 2.4px;
+  padding: 4px 12px;
+}
+.game-dialog #game-title {
+  text-align: center;
+}
+.logo-title {
+  display: flex;
+  font-family: ui-rounded, "SF Pro Rounded", "Arial Rounded MT Bold", "Nunito", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+}
+.logo-letter {
+  display: inline-block;
+  -webkit-text-stroke: 4px #fffaf0;
+  paint-order: stroke fill;
+  text-shadow:
+    0 2px 0 #2f5a44,
+    0 4px 8px rgb(36 70 48 / 26%);
+}
+.logo-letter:nth-child(odd) {
+  transform: translateY(-1px) rotate(-4deg);
+}
+.logo-letter:nth-child(even) {
+  transform: translateY(1px) rotate(3deg);
+}
+.logo-letter.red {
+  color: #e06b5a;
+}
+.logo-letter.sun {
+  color: #f2b83f;
+}
+.logo-letter.teal {
+  color: #3f9fb3;
+}
+.logo-letter.green {
+  color: #2c9c64;
+}
+.logo-letter.plum {
+  color: #9a6bc0;
+}
+.logo-letter.orange {
+  color: #e8874a;
+}
+.logo-rails {
+  width: 64px;
+  height: 6px;
+}
+.logo-rails .ties {
+  stroke: #8a6142;
+  stroke-width: 4;
+}
+.logo-rails .rail {
+  stroke: #4c5a52;
+  stroke-width: 1.8;
+  fill: none;
+}
+.logo-studio {
+  display: grid;
+  justify-items: center;
+  margin-top: 3px;
+  padding: 3px 8px;
+  border-radius: 9px;
+  background: rgb(255 253 243 / 92%);
+  box-shadow: 0 2px 8px rgb(49 79 43 / 16%);
+  font-family: system-ui, sans-serif;
+  font-size: 7.5px;
+  line-height: 1.25;
+  letter-spacing: 1.6px;
+  text-transform: uppercase;
+  color: #2f5a44;
+}
+.logo-studio span:first-child {
+  font-weight: 800;
+}
+.logo-studio span:last-child {
+  font-weight: 500;
+  color: #6b8a6f;
+}
+@media (max-width: 759px) {
+  .library-side .tool-rail {
+    margin: auto 6px auto 5px;
+  }
+  .game-logo {
+    margin-top: 6px;
+  }
+  .library-side .logo-title {
+    font-size: 14px;
+  }
+  .library-side .logo-letter {
+    -webkit-text-stroke-width: 3px;
+  }
+  .library-side .logo-rails {
+    width: 52px;
+  }
+  .dialog-logo .logo-title {
+    font-size: 32px;
+  }
+}

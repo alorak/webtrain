@@ -60,15 +60,6 @@
           title="Yinele (Ctrl/⌘ Shift Z)"
           aria-label="Yinele"
           data-icon="redo"
-        ></button
-        ><span class="divider"></span
-        ><button
-          id="game-menu"
-          class="icon-button"
-          title="Oyun: yeni, kaydet, aç, dışa ve içe aktar"
-          aria-label="Oyun menüsü"
-          aria-haspopup="dialog"
-          data-icon="new"
         ></button>
       </div>
       <aside class="library" aria-label="Dünya araçları">
@@ -77,53 +68,72 @@
           class="decoration-grid"
           aria-label="Eklenecek nesneler"
         ></div>
-        <nav class="tool-rail" aria-label="Araç kategorileri">
+        <div class="library-side">
           <button
-            id="panel-nature"
-            class="rail-button rail-nature active"
+            id="game-menu"
+            class="game-logo"
             type="button"
-            data-panel="nature"
-            data-icon="tree"
-            aria-label="Doğa"
-            aria-pressed="true"
-          ></button>
-          <button
-            id="panel-home"
-            class="rail-button rail-home"
-            type="button"
-            data-panel="buildings"
-            data-icon="house"
-            aria-label="Evler"
-            aria-pressed="false"
-          ></button>
-          <button
-            id="panel-park"
-            class="rail-button rail-park"
-            type="button"
-            data-panel="park"
-            data-icon="park"
-            aria-label="Park ve eğlence"
-            aria-pressed="false"
-          ></button>
-          <button
-            id="track-tool"
-            class="rail-button rail-track"
-            type="button"
-            data-panel="track"
-            data-icon="track"
-            aria-label="Ray"
-            aria-pressed="false"
-          ></button>
-          <button
-            id="train-tool"
-            class="rail-button rail-train"
-            type="button"
-            data-panel="train"
-            data-icon="train"
-            aria-label="İstasyon ve tüneller"
-            aria-pressed="false"
-          ></button>
-        </nav>
+            title="Oyun: yeni, kaydet, aç, dışa ve içe aktar"
+            aria-label="Trains oyun menüsü"
+            aria-haspopup="dialog"
+          >
+            <span class="logo-title" aria-hidden="true"><span class="logo-letter red">T</span><span class="logo-letter sun">R</span><span class="logo-letter teal">A</span><span class="logo-letter green">I</span><span class="logo-letter plum">N</span><span class="logo-letter orange">S</span></span>
+            <svg class="logo-rails" viewBox="0 0 140 12" aria-hidden="true">
+              <path class="ties" d="M6 3v7M18 3v7M30 3v7M42 3v7M54 3v7M66 3v7M78 3v7M90 3v7M102 3v7M114 3v7M126 3v7" />
+              <path class="rail" d="M2 4.5h136M2 8.5h136" />
+            </svg>
+            <span class="logo-studio" aria-hidden="true"
+              ><span>alorak</span><span>games</span></span
+            >
+          </button>
+          <nav class="tool-rail" aria-label="Araç kategorileri">
+            <button
+              id="panel-nature"
+              class="rail-button rail-nature active"
+              type="button"
+              data-panel="nature"
+              data-icon="tree"
+              aria-label="Doğa"
+              aria-pressed="true"
+            ></button>
+            <button
+              id="panel-home"
+              class="rail-button rail-home"
+              type="button"
+              data-panel="buildings"
+              data-icon="house"
+              aria-label="Evler"
+              aria-pressed="false"
+            ></button>
+            <button
+              id="panel-park"
+              class="rail-button rail-park"
+              type="button"
+              data-panel="park"
+              data-icon="park"
+              aria-label="Park ve eğlence"
+              aria-pressed="false"
+            ></button>
+            <button
+              id="track-tool"
+              class="rail-button rail-track"
+              type="button"
+              data-panel="track"
+              data-icon="track"
+              aria-label="Ray"
+              aria-pressed="false"
+            ></button>
+            <button
+              id="train-tool"
+              class="rail-button rail-train"
+              type="button"
+              data-panel="train"
+              data-icon="train"
+              aria-label="İstasyon ve tüneller"
+              aria-pressed="false"
+            ></button>
+          </nav>
+        </div>
       </aside>
       <div
         id="track-actions"
@@ -328,7 +338,16 @@
           aria-label="Kapat"
           data-icon="close"
         ></button>
-        <span class="eyebrow">OYUN</span>
+        <div class="game-logo dialog-logo" aria-hidden="true">
+          <span class="logo-title" aria-hidden="true"><span class="logo-letter red">T</span><span class="logo-letter sun">R</span><span class="logo-letter teal">A</span><span class="logo-letter green">I</span><span class="logo-letter plum">N</span><span class="logo-letter orange">S</span></span>
+          <svg class="logo-rails" viewBox="0 0 140 12" aria-hidden="true">
+            <path class="ties" d="M6 3v7M18 3v7M30 3v7M42 3v7M54 3v7M66 3v7M78 3v7M90 3v7M102 3v7M114 3v7M126 3v7" />
+            <path class="rail" d="M2 4.5h136M2 8.5h136" />
+          </svg>
+          <span class="logo-studio" aria-hidden="true"
+          ><span>alorak</span><span>games</span></span
+          >
+        </div>
         <h2 id="game-title">Dünyanı yönet</h2>
         <div class="game-actions" role="tablist" aria-label="Oyun işlemleri">
           <button data-game="new" role="tab">
