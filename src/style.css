@@ -3155,3 +3155,75 @@ button.game-logo:focus-visible {
     width: min(192px, 46vw);
   }
 }
+
+
+/* Roomier scrollable decoration palette */
+/* Do not try to show every decoration at once. Keep cards comfortably sized
+   and let the palette itself scroll vertically. */
+.decoration-grid {
+  width: clamp(264px, 24vw, 312px);
+  height: 100%;
+  min-height: 0;
+  padding: 8px;
+  column-gap: 7px;
+  row-gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-auto-rows: max-content;
+  align-content: start;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.decoration-grid::-webkit-scrollbar {
+  display: none;
+}
+
+.decor-card,
+.decor-card.wide {
+  width: 100%;
+  height: auto;
+  min-width: 0;
+  min-height: 0;
+  aspect-ratio: 1 / 1;
+  border: 1.5px solid rgb(73 104 72 / 20%);
+  border-radius: 12px;
+  flex: none;
+}
+
+.decor-card img {
+  width: 90%;
+  height: 90%;
+  object-fit: contain;
+}
+
+@media (max-width: 759px) {
+  .decoration-grid {
+    width: clamp(228px, 58vw, 258px);
+    padding: 7px;
+    column-gap: 6px;
+    row-gap: 9px;
+  }
+
+  .decor-card,
+  .decor-card.wide {
+    border-radius: 10px;
+  }
+}
+
+@media (max-width: 420px) {
+  .decoration-grid {
+    width: min(238px, 60vw);
+  }
+}
+
+@media (max-height: 620px) {
+  .decoration-grid {
+    height: 100%;
+    grid-auto-rows: max-content;
+    align-content: start;
+    overflow-y: auto;
+  }
+}
