@@ -6,6 +6,7 @@ export type DecorationKind =
   | "house"
   | "pine"
   | "tree"
+  | "duck"
   | "pond"
   | "windmill"
   | "balloon"
@@ -40,6 +41,7 @@ export const kinds: DecorationKind[] = [
   "house",
   "pine",
   "tree",
+  "duck",
   "pond",
   "windmill",
   "balloon",
