@@ -406,10 +406,11 @@ $("confirm-reset").onclick = () => {
   reset.close();
   toast("Yeni bir dünya, yeni bir hikâye.");
 };
-$("cancel-expand").onclick = () => {
+const cancelExpansion = () => {
   pendingExpansion = null;
-  expand.close();
+  if (expand.open) expand.close();
 };
+$("cancel-expand").onclick = cancelExpansion;
 $("confirm-expand").onclick = () => {
   if (scene && pendingExpansion) {
     scene.expandWorld(pendingExpansion.chunk, pendingExpansion.edge);
@@ -418,6 +419,14 @@ $("confirm-expand").onclick = () => {
   pendingExpansion = null;
   expand.close();
 };
+expand.addEventListener("click", (event) => {
+  // Native dialog backdrop clicks target the dialog element itself.
+  if (event.target === expand) cancelExpansion();
+});
+expand.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  cancelExpansion();
+});
 window.addEventListener("keydown", (e) => {
   if (
     !scene ||
