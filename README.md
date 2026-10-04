@@ -4,10 +4,11 @@
 
 ## Oyna
 
-- **Ray döşe:** Son ray parçasına dokun. Ray ucunda açılan yuvarlak düğmelerle sola, ileri veya sağa devam et. Düğmelerdeki oklar rayın yönüne göre döner; üzerine gelince eklenecek parçayı görürsün. Çöp kutusu son rayı kaldırır.
-- **Dünyana ekle:** Sağdaki kartlardan ev, çam, çınar, gölet, dönme dolap, şelale, kamp, yel değirmeni veya balon seç; boş bir kareye dokun. Seçim yerleştirdikten sonra açık kalır.
-- **Silgi:** Dekorları veya son ray parçasını kaldır. Rayların ortası silinmez; bağlantı korunur.
-- **Tren:** Treni çalıştır/durdur; 0,5×, 1× veya 2× hız seç. Tren açık rotada gidip gelir; başlangıca uygun yönde bağlanan kapalı rotada döner.
+- **Ray döşe:** Rayın açık bir ucuna dokun; açılan yuvarlak düğmelerle sola, ileri veya sağa devam et. Düğmelerdeki oklar rayın yönüne göre döner; üzerine gelince eklenecek parçayı görürsün. Çöp kutusu açık uçtaki rayı kaldırır.
+- **Makas:** Ortadaki düz bir raya dokun; ileri-sağ, ileri-sol, geri-sağ veya geri-sol yönünde yeni bir kol aç. Kesişim bir makas olur: varsayılan olarak düz gider. Makasa dokununca çıkan sarı düğme yönü değiştirir; kolun açık ucundan yol uzatılabilir. Aynı yöne bakan iki açık uç komşu karede buluşunca raylar birleşir.
+- **Dünyana ekle:** Sağdaki kartlardan bina (ev, apartman, market, fırın, kafe, postane, kütüphane, cami, okul, hastane, itfaiye, belediye…), doğa (ağaç kümeleri, çiçekler, kayalar, gölet, şelale, dağ, hayvanlar) veya eğlence parçası seç; boş bir kareye dokun. Binalar ve dekorlar tek seferliktir. Yol, su ve çimen ise fırça gibi seçili kalır; art arda dokunarak döşenebilir. Asfalt, toprak ve taş yollar karenin içinde kalır ve aynı türden komşu yolla tam genişlikte birleşir. Su ile açık ve koyu çimen karenin tamamını kaplar. Çimen bir altlıktır: üstüne ray, bina veya dekor konabilir.
+- **Silgi:** Dekorları veya açık uçtaki ray parçasını kaldır. Rayların ortası silinmez; ağ hep tek parça kalır.
+- **Tren:** Sağ alttaki yeşil oynat/durdur düğmesini kullan. Tren makasların gösterdiği yöne gider, yolun sonunda geri döner, kapalı döngülerde turlar.
 - **Kamera:** Haritayı sürükle. Fare tekerleği, iki parmak veya +/− düğmeleriyle yakınlaş. Ortala düğmesi dünyayı tekrar kadraja alır.
 - **Geri al/yinele:** Son 60 değişiklik oturum boyunca geri alınabilir. Yeni dünya işlemi de geri alınabilir.
 - **Kayıt:** Dünya her değişiklikte bu tarayıcının `localStorage` alanına kaydedilir. Sunucuya gönderilmez. Tarayıcı verileri silinirse dünya kaybolur; kayıt engelliyse oyun o oturumda çalışmaya devam eder. Geri alma geçmişi yenilemede sıfırlanır.
@@ -40,4 +41,4 @@ npm run preview
 
 ## MVP sınırları
 
-24×24 karelik tek harita ve dallanmayan tek rota vardır. Raylar ve dekorlar aynı hücreye yerleşemez; köprü, tünel, makas, çoklu tren ve dekor döndürme bu sürümde yoktur. Dönme dolap/şelale gibi dekorlar sabit çizimlerdir. Harita yerleştirmesi ve kamera için fare veya dokunmatik gerekir; panel ve ray yönleri klavyeyle kullanılabilir.
+Harita 24×24 karelik parçalarla genişler. Bir karede en fazla bir makas olur; hemzemin geçit (dik kesişen raylar), köprü, çoklu tren ve dekor döndürme bu sürümde yoktur. Raylar ve dekorlar aynı hücreye yerleşemez (çimen altlığı, istasyon ve tünel hariç). Dönme dolap/şelale gibi dekorlar sabit çizimlerdir. Harita yerleştirmesi ve kamera için fare veya dokunmatik gerekir; panel ve ray yönleri klavyeyle kullanılabilir.

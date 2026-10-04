@@ -2286,3 +2286,126 @@ kbd {
     height: auto;
   }
 }
+
+.decor-divider {
+  grid-column: 1 / -1;
+  width: 100%;
+  height: 0;
+  margin: 2px 0;
+  border: 0;
+  border-top: 1.5px solid #e1e5d6;
+}
+.decor-divider[hidden] {
+  display: none;
+}
+
+
+/* Switch editing and the compact play button */
+.branch-actions .direction-buttons button,
+.branch-actions .direction-buttons button:nth-child(2) {
+  background: #fffdf3;
+  color: #3c7667;
+  border-color: #fff;
+}
+.branch-actions .direction-buttons button {
+  width: 46px;
+  height: 46px;
+}
+.track-actions[hidden],
+.switch-toggle[hidden],
+.remove-track[hidden] {
+  display: none !important;
+}
+.direction-buttons button:disabled,
+.direction-buttons button.blocked {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.switch-toggle {
+  position: fixed;
+  z-index: 9;
+  width: 46px;
+  height: 46px;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #f3c85d;
+  color: #3d4a2c;
+  border: 2px solid #fff7dd;
+  box-shadow:
+    0 4px 0 #b18a2e,
+    0 8px 16px #315a2930;
+}
+.switch-toggle:hover {
+  background: #f7d576;
+}
+.switch-toggle svg {
+  width: 24px;
+  height: 24px;
+  stroke-width: 2.4;
+  transition: transform 0.15s ease;
+}
+.switch-toggle.thrown svg {
+  transform: scaleX(-1);
+}
+
+.bottom-bar {
+  left: auto;
+  right: 14px;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  z-index: 25;
+}
+#play {
+  width: 60px;
+  height: 60px;
+  min-height: 0;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: #2c9c64;
+  border: 3px solid #fff7dd;
+  box-shadow:
+    0 4px 0 #1f7449,
+    0 8px 18px #2a4f3533;
+  color: #fff;
+}
+#play:hover {
+  background: #33ad70;
+}
+#play.playing {
+  background: #2c9c64;
+  border-color: #fff7dd;
+  box-shadow:
+    0 4px 0 #1f7449,
+    0 8px 18px #2a4f3533;
+}
+#play svg {
+  width: 26px;
+  height: 26px;
+}
+#play:not(.playing) svg {
+  margin-left: 3px;
+}
+.view-tools {
+  bottom: 18px;
+}
+#toast {
+  bottom: 24px;
+}
+@media (max-width: 759px) {
+  .bottom-bar {
+    left: auto;
+    right: 10px;
+    bottom: max(10px, env(safe-area-inset-bottom));
+  }
+  #play {
+    width: 54px;
+    height: 54px;
+    padding: 0;
+  }
+  .view-tools {
+    bottom: 12px;
+  }
+}

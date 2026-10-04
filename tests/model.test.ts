@@ -1,8 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  addBranch,
+  advanceTrain,
   appendTrack,
+  branchCandidate,
   candidate,
+  extendFrom,
+  isSwitch,
+  openEnds,
+  removableTrack,
+  removeTrack,
+  same,
+  toggleSwitch,
   connectedDecorationEdges,
   createWorld,
   expandChunk,
@@ -124,11 +134,12 @@ test("tracks can continue across an expanded chunk boundary", () => {
   });
 });
 
-test("adjacent asphalt and dirt roads connect only to their own kind", () => {
+test("adjacent roads connect only to their own kind", () => {
   const world = fresh();
   assert.equal(placeDecoration(world, { x: 9, y: 9 }, "roadAsphalt"), true);
   assert.equal(placeDecoration(world, { x: 10, y: 9 }, "roadAsphalt"), true);
   assert.equal(placeDecoration(world, { x: 9, y: 10 }, "roadDirt"), true);
+  assert.equal(placeDecoration(world, { x: 8, y: 10 }, "roadStone"), true);
 
   assert.deepEqual(
     connectedDecorationEdges(world, { x: 9, y: 9 }, "roadAsphalt"),
@@ -140,6 +151,10 @@ test("adjacent asphalt and dirt roads connect only to their own kind", () => {
   );
   assert.deepEqual(
     connectedDecorationEdges(world, { x: 9, y: 10 }, "roadDirt"),
+    [false, false, false, false],
+  );
+  assert.deepEqual(
+    connectedDecorationEdges(world, { x: 8, y: 10 }, "roadStone"),
     [false, false, false, false],
   );
   assert.deepEqual(parseWorld(JSON.stringify(world)), world);
@@ -211,4 +226,87 @@ test("corrupt, disconnected, unknown, duplicate, oversized and falsely closed sa
   ];
   for (const value of cases)
     assert.equal(parseWorld(JSON.stringify(value)), null);
+});
+
+test("grass is ground cover under objects and rails", () => {
+  const world = fresh();
+  assert.equal(placeDecoration(world, { x: 9, y: 9 }, "grassLight"), true);
+  assert.equal(placeDecoration(world, { x: 9, y: 9 }, "grassDark"), false);
+  assert.equal(placeDecoration(world, { x: 9, y: 9 }, "house"), true);
+  assert.equal(placeDecoration(world, { x: 9, y: 9 }, "tree"), false);
+  assert.equal(placeDecoration(world, { x: 8, y: 8 }, "grassDark"), true);
+
+  const last = world.tracks.at(-1)!;
+  const next = nextCell(last);
+  assert.equal(placeDecoration(world, next, "grassLight"), true);
+  assert.notEqual(candidate(world, 0), null);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+});
+
+const line = () => {
+  const world = fresh();
+  appendTrack(world, 0);
+  appendTrack(world, 0);
+  return world;
+};
+
+test("straight rails branch into switches in four directions", () => {
+  const world = line();
+  const cell = { x: 9, y: 8 };
+  assert.deepEqual(branchCandidate(world, cell, "forwardRight"), { ...cell, entry: 0, exit: 1 });
+  assert.deepEqual(branchCandidate(world, cell, "forwardLeft"), { ...cell, entry: 0, exit: 3 });
+  assert.deepEqual(branchCandidate(world, cell, "backRight"), { ...cell, entry: 2, exit: 3 });
+  assert.deepEqual(branchCandidate(world, cell, "backLeft"), { ...cell, entry: 2, exit: 1 });
+  assert.ok(addBranch(world, cell, "forwardRight"));
+  assert.equal(isSwitch(world, cell), true);
+  assert.equal(branchCandidate(world, cell, "forwardLeft"), null);
+  const end = openEnds(world).find((e) => same(e.track, cell))!;
+  assert.deepEqual(extendFrom(world, end, 0), { x: 9, y: 9, entry: 1, exit: 1 });
+  assert.equal(placeDecoration(world, cell, "stationSmall"), false);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+});
+
+test("switches steer facing trains", () => {
+  const world = line();
+  addBranch(world, { x: 9, y: 8 }, "forwardRight");
+  const start = { track: 0, forward: true, t: 0.5 };
+  let moved = advanceTrain(world, start, 1)!;
+  assert.deepEqual(world.tracks[moved.track], { x: 9, y: 8, entry: 0, exit: 0 });
+  assert.ok(toggleSwitch(world, { x: 9, y: 8 }));
+  assert.deepEqual(world.switches, ["9,8"]);
+  moved = advanceTrain(world, start, 1)!;
+  assert.deepEqual(world.tracks[moved.track], { x: 9, y: 8, entry: 0, exit: 1 });
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+  assert.ok(toggleSwitch(world, { x: 9, y: 8 }));
+  assert.equal(world.switches, undefined);
+});
+
+test("trains turn around at dead ends and wagons stop there", () => {
+  const world = fresh();
+  const turned = advanceTrain(world, { track: 0, forward: true, t: 0.5 }, 1)!;
+  assert.equal(turned.forward, false);
+  assert.ok(turned.t > 0 && turned.t < 1);
+  assert.equal(
+    advanceTrain(world, { track: 0, forward: true, t: 0.5 }, 1, { stopAtEnd: true }),
+    null,
+  );
+});
+
+test("only loose ends can be removed, keeping the network whole", () => {
+  const world = line();
+  assert.equal(removableTrack(world, { x: 9, y: 8 }), null);
+  assert.deepEqual(removableTrack(world, { x: 10, y: 8 }), world.tracks[2]);
+  addBranch(world, { x: 9, y: 8 }, "backLeft");
+  toggleSwitch(world, { x: 9, y: 8 });
+  assert.ok(removeTrack(world, { x: 9, y: 8 }));
+  assert.equal(isSwitch(world, { x: 9, y: 8 }), false);
+  assert.equal(world.switches, undefined);
+  assert.deepEqual(parseWorld(JSON.stringify(world)), world);
+});
+
+test("malformed switches are rejected", () => {
+  const two = fresh();
+  two.tracks.push({ x: 8, y: 8, entry: 1, exit: 1 });
+  assert.equal(parseWorld(JSON.stringify(two)), null);
+  assert.equal(parseWorld(JSON.stringify({ ...line(), switches: ["9,8"] })), null);
 });

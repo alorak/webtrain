@@ -18,7 +18,7 @@
       <div
         id="game-root"
         role="application"
-        aria-label="Tren dünyası. Haritayı sürükleyerek taşıyabilir, son rayı seçerek yolu uzatabilirsin."
+        aria-label="Tren dünyası. Haritayı sürükleyerek taşıyabilir, bir raya dokunarak yolu uzatabilir ya da makas açabilirsin."
       ></div>
       <header class="topbar">
         <a class="brand" href="./" aria-label="WebTrain ana sayfa"
@@ -128,7 +128,7 @@
         id="track-actions"
         class="track-actions"
         role="group"
-        aria-label="Son rayı uzat"
+        aria-label="Rayı uzat"
       >
         <span class="endpoint-label">YOLUN BURADAN DEVAM ETSİN</span>
         <div class="direction-buttons">
@@ -154,11 +154,34 @@
         <button
           id="remove-track"
           class="remove-track"
-          title="Son rayı sil"
-          aria-label="Son rayı sil"
+          title="Rayı sil"
+          aria-label="Rayı sil"
           data-icon="trash"
         ></button>
       </div>
+      <div
+        id="branch-actions"
+        class="track-actions branch-actions"
+        role="group"
+        aria-label="Raydan makasla yeni kol aç"
+        hidden
+      >
+        <div class="direction-buttons">
+          <button data-branch="forwardLeft" title="İleri sola makas" aria-label="İleri sola makas aç" data-icon="forward"></button
+          ><button data-branch="forwardRight" title="İleri sağa makas" aria-label="İleri sağa makas aç" data-icon="forward"></button
+          ><button data-branch="backLeft" title="Geri sola makas" aria-label="Geri sola makas aç" data-icon="forward"></button
+          ><button data-branch="backRight" title="Geri sağa makas" aria-label="Geri sağa makas aç" data-icon="forward"></button>
+        </div>
+      </div>
+      <button
+        id="switch-toggle"
+        class="switch-toggle"
+        type="button"
+        title="Makası değiştir"
+        aria-label="Makası değiştir"
+        data-icon="switch"
+        hidden
+      ></button>
       <button
         id="delete-selected"
         class="delete-selected"
@@ -202,14 +225,13 @@
         <div class="hint">
           <span class="hint-icon" data-icon="pointer"></span
           ><span id="tool-hint"
-            ><strong>Rayın ucuna dokun.</strong><br />Bir yön seç, yolculuğu
-            uzat.</span
+            ><strong>Bir raya dokun.</strong><br />Uzat, makas aç ya da makası
+            değiştir.</span
           >
         </div>
         <div class="train-controls">
-          <button id="play">
-            <span data-icon="play"></span
-            ><span id="play-label">Treni çalıştır</span></button
+          <button id="play" title="Treni çalıştır" aria-label="Treni çalıştır">
+            <span data-icon="play"></span></button
           ><button id="speed" title="Tren hızı" aria-label="Tren hızı: 1 kat">
             1×
           </button>
@@ -235,16 +257,17 @@
         <h2>Küçük adımlarla,<br />kocaman bir dünya.</h2>
         <ol>
           <li>
-            <strong>Yolunu çiz.</strong> Son raya dokun; sola, ileri veya sağa
-            ekle. Rayın yanındaki çöp kutusuyla son parçayı kaldır.
+            <strong>Yolunu çiz.</strong> Rayın açık ucuna dokun; sola, ileri
+            veya sağa ekle. Düz bir raya dokununca dört yöne makas açabilirsin;
+            makasa dokunup sarı düğmeyle yönünü değiştir.
           </li>
           <li>
             <strong>Hayal gücünü yerleştir.</strong> Sağdan bir dekor seç, boş
             bir kareye dokun. Silgiyle dekorları kaldırabilirsin.
           </li>
           <li>
-            <strong>Yolculuk başlasın.</strong> Treni çalıştır. Açık rotada
-            gidip gelir, kapalı rotada turlar.
+            <strong>Yolculuk başlasın.</strong> Sağ alttaki yeşil düğmeyle
+            treni çalıştır. Makaslara göre yön seçer, yolun sonunda geri döner.
           </li>
         </ol>
         <p>
