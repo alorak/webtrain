@@ -6,8 +6,10 @@ import {
   isTrackOverlayKind,
   sampleTrack,
   type Chunk,
+  entrances,
   vectors,
   type DecorationKind,
+  type Entrance,
   type Point,
   type GrassKind,
   type RoadKind,
@@ -85,25 +87,13 @@ const roadStyles: Record<RoadKind, { surface: number; edge: number; light: numbe
   roadStone: { surface: 0x9d907a, edge: 0x77695a, light: 0xe3d8bf, dark: 0xcdbfa2 },
 };
 
-export function roadTile(g: G, kind: RoadKind, connected: boolean[]) {
-  // Tile based like water: the road sits inset from the grass and grows a
-  // full-width arm to every edge shared with the same kind of road, so
-  // neighbours merge into one continuous strip.
+type Rect = [x0: number, x1: number, y0: number, y1: number];
+type Segment = [x0: number, y0: number, x1: number, y1: number];
+// Lays road surface over the given rectangles, with texture on a fixed 8×8
+// grid per tile (so it lines up across tiles) and the given edge lines.
+function paveRoad(g: G, kind: RoadKind, pieces: Rect[], edges: Segment[], seams: Segment[] = []) {
   const style = roadStyles[kind];
-  const h = 0.375;
-  const pieces: [number, number, number, number][] = [[-h, h, -h, h]];
-  vectors.forEach((v, heading) => {
-    if (!connected[heading]) return;
-    pieces.push([
-      v.x > 0 ? h : v.x < 0 ? -0.5 : -h,
-      v.x > 0 ? 0.5 : v.x < 0 ? -h : h,
-      v.y > 0 ? h : v.y < 0 ? -0.5 : -h,
-      v.y > 0 ? 0.5 : v.y < 0 ? -h : h,
-    ]);
-  });
   for (const [x0, x1, y0, y1] of pieces) pad(g, x0, x1, y0, y1, style.surface);
-
-  // Texture follows a fixed 8×8 grid per tile so it lines up across tiles.
   const step = 0.125;
   for (let i = 0; i < 8; i++)
     for (let j = 0; j < 8; j++) {
@@ -120,23 +110,57 @@ export function roadTile(g: G, kind: RoadKind, connected: boolean[]) {
         ellipse(g, hash % 2 ? style.light : style.dark, x, y, 4 + (hash % 3), 2.5, 0.75);
       }
     }
+  for (const [x0, y0, x1, y1] of edges) trim(g, style.edge, 1.6, [x0, y0, 0], [x1, y1, 0]);
+  for (const [x0, y0, x1, y1] of seams)
+    g.lineStyle(1.2, style.edge, 0.55).lineBetween(...iso([x0, y0, 0]), ...iso([x1, y1, 0]));
+}
 
-  // Outline the joined shape: closed centre sides plus both sides of each arm.
-  const corners: [[number, number], [number, number]][] = [
-    [[h, -h], [h, h]],
-    [[-h, h], [h, h]],
-    [[-h, -h], [-h, h]],
-    [[-h, -h], [h, -h]],
-  ];
-  corners.forEach(([a, b], heading) => {
-    if (!connected[heading]) {
-      trim(g, style.edge, 1.6, [...a, 0], [...b, 0]);
-      return;
-    }
-    const v = vectors[heading];
-    for (const [x, y] of [a, b])
-      trim(g, style.edge, 1.6, [x, y, 0], [x + v.x * (0.5 - h), y + v.y * (0.5 - h), 0]);
+export function roadTile(
+  g: G,
+  kind: RoadKind,
+  neighbours: (RoadKind | null | false)[],
+  doors: (Entrance | null)[] = [],
+) {
+  // Tile based like water: the road sits inset from the grass and grows a
+  // full-width arm to every edge shared with another road, so neighbours
+  // merge into one continuous strip. A change of surface gets a thin seam,
+  // and a narrower arm reaches out to the door of a building next to it.
+  const h = 0.375;
+  const pieces: Rect[] = [[-h, h, -h, h]];
+  const edges: Segment[] = [];
+  const seams: Segment[] = [];
+  vectors.forEach((v, heading) => {
+    // Work along this side: "a" runs along the edge, "n" points outwards.
+    const at = (a: number, n: number): [number, number] =>
+      v.x ? [n * v.x, a] : [a, n * v.y];
+    const rect = (a0: number, a1: number): Rect => {
+      const [x0, y0] = at(a0, h);
+      const [x1, y1] = at(a1, 0.5);
+      return [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)];
+    };
+    const side = (a: number) => [...at(a, h), ...at(a, 0.5)] as Segment;
+    const along = (a0: number, a1: number, n = h) => [...at(a0, n), ...at(a1, n)] as Segment;
+    const door = doors[heading];
+    if (neighbours[heading]) {
+      pieces.push(rect(-h, h));
+      edges.push(side(-h), side(h));
+      if (neighbours[heading] !== kind) seams.push(along(-h, h, 0.5));
+    } else if (door) {
+      const a0 = Math.max(-h, door.u - door.w);
+      const a1 = Math.min(h, door.u + door.w);
+      pieces.push(rect(a0, a1));
+      edges.push(along(-h, a0), along(a1, h), side(a0), side(a1));
+    } else edges.push(along(-h, h));
   });
+  paveRoad(g, kind, pieces, edges, seams);
+}
+
+// The building's end of a road that leads to its door.
+function doorWalk(g: G, kind: RoadKind, { u, w, from }: Entrance) {
+  paveRoad(g, kind, [[u - w, u + w, from, 0.5]], [
+    [u - w, from, u - w, 0.5],
+    [u + w, from, u + w, 0.5],
+  ]);
 }
 
 export function grassTile(g: G, kind: GrassKind, connected: boolean[]) {
@@ -380,7 +404,6 @@ function fence(g: G, points: [number, number][]) {
 function hospital(g: G, emblem: "cross" | "crescent") {
   const b: Box = [-0.34, 0.3, -0.3, 0.3, 0, 40];
   shadow(g, b);
-  pad(g, -0.1, 0.08, 0.3, 0.46, 0xd8d2bd);
   block(g, b, 0xf7f4ec, 0xdcd7ca, 0xd2d9d7);
   flatRoof(g, b, 0xc3cbc9);
   pane(g, "l", 0.3, -0.34, 0.3, 35, 37, 0xd9574e);
@@ -571,7 +594,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   house(g) {
     const b: Box = [-0.3, 0.3, -0.26, 0.26, 0, 28];
     shadow(g, b);
-    pad(g, 0.09, 0.19, 0.26, 0.46, 0xe6d8b0);
     block(g, b, 0xf6ead0, 0xdcc8a4);
     win(g, "l", 0.26, -0.22, -0.1, 11, 21);
     door(g, "l", 0.26, 0.08, 0.2, 18);
@@ -587,7 +609,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   houseBlue(g) {
     const b: Box = [-0.28, 0.28, -0.3, 0.3, 0, 26];
     shadow(g, b);
-    pad(g, -0.05, 0.05, 0.3, 0.46, 0xe6d8b0);
     block(g, b, 0xf6ead0, 0xdcc8a4);
     win(g, "l", 0.3, -0.22, -0.12, 9, 18);
     win(g, "l", 0.3, 0.12, 0.22, 9, 18);
@@ -601,7 +622,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
     const main: Box = [-0.32, 0.06, -0.3, 0.3, 0, 30];
     const wing: Box = [0.06, 0.34, -0.2, 0.18, 0, 20];
     shadow(g, [-0.32, 0.34, -0.3, 0.3, 0, 0]);
-    pad(g, 0.16, 0.25, 0.18, 0.46, 0xe6d8b0);
     block(g, main, 0xf3dfc0, 0xd9c0a0);
     win(g, "l", 0.3, -0.27, -0.18, 10, 20);
     win(g, "l", 0.3, -0.09, 0, 10, 20);
@@ -615,7 +635,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   cottage(g) {
     const b: Box = [-0.22, 0.22, -0.2, 0.2, 0, 20];
     shadow(g, b);
-    pad(g, 0.03, 0.11, 0.2, 0.44, 0xd9c79a);
     block(g, b, 0xefe2c6, 0xd2c0a0);
     door(g, "l", 0.2, 0.03, 0.11, 14, 0x8a6a4f);
     win(g, "l", 0.2, -0.15, -0.05, 7, 14);
@@ -656,7 +675,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   fireStation(g) {
     const b: Box = [-0.36, 0.3, -0.3, 0.3, 0, 32];
     shadow(g, b);
-    pad(g, -0.33, 0.25, 0.3, 0.46, 0xd8d2bd);
     block(g, b, 0xd2604f, 0xab4a40, 0xe0d2b6);
     flatRoof(g, b, 0xc9bb9e);
     pane(g, "l", 0.3, -0.36, 0.3, 26, 28.5, 0xfff2d4);
@@ -680,7 +698,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   policeStation(g) {
     const b: Box = [-0.34, 0.3, -0.3, 0.3, 0, 30];
     shadow(g, b);
-    pad(g, -0.1, 0.08, 0.36, 0.46, 0xd8d2bd);
     block(g, b, 0xeee9dc, 0xcfc8b6, 0xbfc6c8);
     flatRoof(g, b, 0xaeb6b9);
     pane(g, "l", 0.3, -0.34, 0.3, 22, 27, 0x4f74a0);
@@ -704,7 +721,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   school(g) {
     const b: Box = [-0.38, 0.3, -0.26, 0.26, 0, 26];
     shadow(g, b);
-    pad(g, -0.07, 0.05, 0.26, 0.46, 0xe6d8b0);
     block(g, b, 0xf3d796, 0xd8b673);
     for (const [a, c] of [[-0.33, -0.25], [-0.2, -0.12], [0.1, 0.18], [0.21, 0.27]])
       win(g, "l", 0.26, a, c, 9, 19);
@@ -787,7 +803,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   windmill(g) {
     const [b, t, top] = [0.2, 0.12, 50];
     shadow(g, [-b, b, -b, b, 0, 0]);
-    pad(g, -0.04, 0.04, b, 0.44, 0xe6d8b0);
     face(g, 0xf3e5bd, [-b, b, 0], [b, b, 0], [t, t, top], [-t, t, top]);
     face(g, 0xd5c69d, [b, -b, 0], [b, b, 0], [t, t, top], [t, -t, top]);
     pane(g, "l", b, -0.045, 0.045, 0, 14, 0x7c6650);
@@ -946,7 +961,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   funhouse(g) {
     const b: Box = [-0.3, 0.26, -0.28, 0.26, 0, 30];
     shadow(g, b);
-    pad(g, -0.07, 0.07, 0.26, 0.44, 0xe6d8b0);
     block(g, b, 0xf6d27a, 0xd8b05a);
     for (let i = 0; i < 8; i++) {
       const a = -0.3 + i * 0.07;
@@ -1271,7 +1285,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   apartment(g) {
     const b: Box = [-0.3, 0.28, -0.28, 0.26, 0, 58];
     shadow(g, b);
-    pad(g, -0.06, 0.06, 0.26, 0.44, 0xd8d2bd);
     block(g, b, 0xe9d6c0, 0xc9b49c, 0xc9cfcc);
     flatRoof(g, b, 0xb7bebb);
     for (const z of [19, 38]) {
@@ -1314,7 +1327,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   bakery(g) {
     const b: Box = [-0.28, 0.26, -0.24, 0.22, 0, 26];
     shadow(g, b);
-    pad(g, 0.06, 0.15, 0.22, 0.44, 0xe6d8b0);
     block(g, b, 0xf2dcb4, 0xd4b98d);
     win(g, "l", 0.22, -0.22, -0.04, 7, 18);
     for (const u of [-0.19, -0.13, -0.07]) ellipse(g, 0xc98a4b, ...iso([u, 0.22, 9.5]), 6, 3.5);
@@ -1360,7 +1372,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   mosque(g) {
     const b: Box = [-0.28, 0.24, -0.28, 0.2, 0, 24];
     shadow(g, [-0.42, 0.24, -0.28, 0.34, 0, 0]);
-    pad(g, -0.09, 0.05, 0.2, 0.44, 0xe6dcc6);
     block(g, b, 0xf1e8d6, 0xd4c8b0, 0xe2d8c3);
     pane(g, "l", 0.2, -0.28, 0.24, 21, 24, 0xdccfb2);
     pane(g, "r", 0.24, -0.28, 0.2, 21, 24, 0xc4b796);
@@ -1406,7 +1417,6 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   postOffice(g) {
     const b: Box = [-0.3, 0.28, -0.26, 0.22, 0, 28];
     shadow(g, b);
-    pad(g, -0.06, 0.06, 0.22, 0.44, 0xd8d2bd);
     block(g, b, 0xf3ead6, 0xd9cdb4, 0xd5cfbf);
     flatRoof(g, b, 0xc5bfae);
     pane(g, "l", 0.22, -0.3, 0.28, 20, 26, 0xf3c85d);
@@ -1425,7 +1435,26 @@ const models: Partial<Record<DecorationKind, (g: G) => void>> = {
   },
 };
 
-export function decoration(g: G, kind: DecorationKind) {
+// Footpath colours for doors that have their own path when no road is near.
+const doorPaths: Partial<Record<DecorationKind, number>> = {
+  house: 0xe6d8b0,
+  houseBlue: 0xe6d8b0,
+  houseRed: 0xe6d8b0,
+  cottage: 0xd9c79a,
+  apartment: 0xd8d2bd,
+  bakery: 0xe6d8b0,
+  postOffice: 0xd8d2bd,
+  fireStation: 0xd8d2bd,
+  policeStation: 0xd8d2bd,
+  hospital: 0xd8d2bd,
+  hospitalCrescent: 0xd8d2bd,
+  school: 0xe6d8b0,
+  mosque: 0xe6dcc6,
+  windmill: 0xe6d8b0,
+  funhouse: 0xe6d8b0,
+};
+
+export function decoration(g: G, kind: DecorationKind, road: RoadKind | null = null) {
   if (isRoadKind(kind)) {
     roadTile(g, kind, [false, false, false, false]);
     return;
@@ -1445,6 +1474,11 @@ export function decoration(g: G, kind: DecorationKind) {
     trackDecoration(g, kind, track);
     return;
   }
+  // A road in front of the door is carried up to it; otherwise a footpath.
+  const door = entrances[kind];
+  if (door && road) doorWalk(g, road, door);
+  else if (door && doorPaths[kind] !== undefined)
+    pad(g, door.u - door.w, door.u + door.w, door.from, 0.45, doorPaths[kind]!);
   const model = models[kind];
   if (model) {
     const scale = modelScale[kind] ?? 1;

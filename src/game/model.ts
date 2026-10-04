@@ -121,6 +121,88 @@ export function connectedDecorationEdges(
   );
 }
 
+// Roads join any neighbouring road, whatever its surface; each side gives
+// the neighbour's kind, or null where there is none.
+export function roadNeighbours(
+  world: Pick<World, "decorations">,
+  cell: Point,
+): (RoadKind | null)[] {
+  return vectors.map((vector) => {
+    const road = world.decorations.find(
+      (d) =>
+        isRoadKind(d.kind) &&
+        d.x === cell.x + vector.x &&
+        d.y === cell.y + vector.y,
+    );
+    return road ? (road.kind as RoadKind) : null;
+  });
+}
+
+// Building doors all face +y (the lower left side on screen). u is the
+// door's centre along that face, w half its width and from where the
+// building's front ends, all in tile units from the cell centre.
+export interface Entrance {
+  u: number;
+  w: number;
+  from: number;
+}
+export const entranceSide = 1;
+const hospitalDoor: Entrance = { u: -0.01, w: 0.09, from: 0.3 };
+export const entrances: Partial<Record<DecorationKind, Entrance>> = {
+  house: { u: 0.14, w: 0.05, from: 0.26 },
+  houseBlue: { u: 0, w: 0.05, from: 0.3 },
+  houseRed: { u: 0.205, w: 0.045, from: 0.18 },
+  cottage: { u: 0.07, w: 0.04, from: 0.2 },
+  apartment: { u: 0, w: 0.06, from: 0.26 },
+  farmhouse: { u: -0.02, w: 0.06, from: 0.38 },
+  market: { u: 0.19, w: 0.05, from: 0.22 },
+  bakery: { u: 0.105, w: 0.045, from: 0.22 },
+  cafe: { u: 0.02, w: 0.045, from: 0.16 },
+  postOffice: { u: 0, w: 0.06, from: 0.22 },
+  library: { u: -0.02, w: 0.09, from: 0.32 },
+  fireStation: { u: -0.04, w: 0.29, from: 0.3 },
+  policeStation: { u: -0.01, w: 0.09, from: 0.36 },
+  hospital: hospitalDoor,
+  hospitalCrescent: hospitalDoor,
+  school: { u: -0.01, w: 0.06, from: 0.26 },
+  mosque: { u: -0.02, w: 0.07, from: 0.2 },
+  cityHall: { u: -0.02, w: 0.18, from: 0.46 },
+  windmill: { u: 0, w: 0.04, from: 0.2 },
+  funhouse: { u: 0, w: 0.07, from: 0.26 },
+  icecream: { u: -0.04, w: 0.08, from: 0.2 },
+};
+
+// The road in front of a building's door, if there is one.
+export function roadAtEntrance(
+  world: Pick<World, "decorations">,
+  building: Decoration,
+): RoadKind | null {
+  if (!entrances[building.kind]) return null;
+  const v = vectors[entranceSide];
+  const road = world.decorations.find(
+    (d) => isRoadKind(d.kind) && d.x === building.x + v.x && d.y === building.y + v.y,
+  );
+  return road ? (road.kind as RoadKind) : null;
+}
+
+// Doors that open onto this road tile, per side of the tile.
+export function doorsOnRoad(
+  world: Pick<World, "decorations">,
+  cell: Point,
+): (Entrance | null)[] {
+  return vectors.map((v, side) => {
+    if (side !== (entranceSide + 2) % 4) return null;
+    const building = world.decorations.find(
+      (d) =>
+        !isGroundLayer(d.kind) &&
+        entrances[d.kind] &&
+        d.x === cell.x + v.x &&
+        d.y === cell.y + v.y,
+    );
+    return building ? entrances[building.kind]! : null;
+  });
+}
+
 export const kinds: DecorationKind[] = [
   "house",
   "houseBlue",

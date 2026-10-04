@@ -27,6 +27,9 @@ import {
   placeDecoration,
   removableTrack,
   removeTrack,
+  doorsOnRoad,
+  roadAtEntrance,
+  roadNeighbours,
   same,
   sampleTrack,
   STORAGE_KEY,
@@ -415,11 +418,7 @@ export class WebTrainScene extends Phaser.Scene {
       } else if (isWater) {
         waterTile(g, connectedDecorationEdges(this.world, d, d.kind));
       } else if (roadKind) {
-        roadTile(
-          g,
-          roadKind,
-          connectedDecorationEdges(this.world, d, roadKind),
-        );
+        roadTile(g, roadKind, roadNeighbours(this.world, d), doorsOnRoad(this.world, d));
       } else if (isOverlay) {
         // Stations and tunnels split into layers so trains pass between them.
         const track = this.world.tracks.find((t) => same(t, d));
@@ -432,7 +431,7 @@ export class WebTrainScene extends Phaser.Scene {
             if (i > 0) extra.push(target);
           });
       } else {
-        decoration(g, d.kind);
+        decoration(g, d.kind, roadAtEntrance(this.world, d));
       }
       return g;
     });

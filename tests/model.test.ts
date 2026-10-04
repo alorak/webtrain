@@ -11,9 +11,12 @@ import {
   openEnds,
   removableTrack,
   removeTrack,
+  doorsOnRoad,
+  entrances,
+  roadAtEntrance,
+  roadNeighbours,
   same,
   toggleSwitch,
-  connectedDecorationEdges,
   createWorld,
   expandChunk,
   exposedChunkEdges,
@@ -134,29 +137,32 @@ test("tracks can continue across an expanded chunk boundary", () => {
   });
 });
 
-test("adjacent roads connect only to their own kind", () => {
+test("adjacent roads join whatever their surface", () => {
   const world = fresh();
   assert.equal(placeDecoration(world, { x: 9, y: 9 }, "roadAsphalt"), true);
   assert.equal(placeDecoration(world, { x: 10, y: 9 }, "roadAsphalt"), true);
   assert.equal(placeDecoration(world, { x: 9, y: 10 }, "roadDirt"), true);
   assert.equal(placeDecoration(world, { x: 8, y: 10 }, "roadStone"), true);
+  assert.equal(placeDecoration(world, { x: 8, y: 11 }, "water"), true);
 
-  assert.deepEqual(
-    connectedDecorationEdges(world, { x: 9, y: 9 }, "roadAsphalt"),
-    [true, false, false, false],
-  );
-  assert.deepEqual(
-    connectedDecorationEdges(world, { x: 10, y: 9 }, "roadAsphalt"),
-    [false, false, true, false],
-  );
-  assert.deepEqual(
-    connectedDecorationEdges(world, { x: 9, y: 10 }, "roadDirt"),
-    [false, false, false, false],
-  );
-  assert.deepEqual(
-    connectedDecorationEdges(world, { x: 8, y: 10 }, "roadStone"),
-    [false, false, false, false],
-  );
+  assert.deepEqual(roadNeighbours(world, { x: 9, y: 9 }), [
+    "roadAsphalt",
+    "roadDirt",
+    null,
+    null,
+  ]);
+  assert.deepEqual(roadNeighbours(world, { x: 9, y: 10 }), [
+    null,
+    null,
+    "roadStone",
+    "roadAsphalt",
+  ]);
+  assert.deepEqual(roadNeighbours(world, { x: 8, y: 10 }), [
+    "roadDirt",
+    null,
+    null,
+    null,
+  ]);
   assert.deepEqual(parseWorld(JSON.stringify(world)), world);
 });
 
@@ -309,4 +315,26 @@ test("malformed switches are rejected", () => {
   two.tracks.push({ x: 8, y: 8, entry: 1, exit: 1 });
   assert.equal(parseWorld(JSON.stringify(two)), null);
   assert.equal(parseWorld(JSON.stringify({ ...line(), switches: ["9,8"] })), null);
+});
+
+test("roads in front of a door reach up to it", () => {
+  const world = fresh();
+  assert.ok(placeDecoration(world, { x: 9, y: 9 }, "hospitalCrescent"));
+  assert.ok(placeDecoration(world, { x: 9, y: 10 }, "roadDirt"));
+  assert.ok(placeDecoration(world, { x: 10, y: 9 }, "roadAsphalt"));
+  assert.ok(placeDecoration(world, { x: 12, y: 12 }, "tree"));
+  assert.ok(placeDecoration(world, { x: 12, y: 13 }, "roadStone"));
+  const [hospital, , , tree] = world.decorations;
+  // Only the road on the door's side counts.
+  assert.equal(roadAtEntrance(world, hospital), "roadDirt");
+  assert.deepEqual(doorsOnRoad(world, { x: 9, y: 10 }), [
+    null,
+    null,
+    null,
+    entrances.hospitalCrescent,
+  ]);
+  assert.deepEqual(doorsOnRoad(world, { x: 10, y: 9 }), [null, null, null, null]);
+  // Trees have no door.
+  assert.equal(roadAtEntrance(world, tree), null);
+  assert.deepEqual(doorsOnRoad(world, { x: 12, y: 13 }), [null, null, null, null]);
 });
