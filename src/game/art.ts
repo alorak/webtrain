@@ -495,8 +495,12 @@ export function trackDecoration(g: G, kind: DecorationKind, track: Track) {
     y: (tangent.x + tangent.y) * 24,
   };
   const angle = Math.atan2(screen.y, screen.x);
+  const center = project(track);
+  const midpoint = project(sample.point);
 
-  g.save().rotateCanvas(angle);
+  g.save()
+    .translateCanvas(midpoint.x - center.x, midpoint.y - center.y)
+    .rotateCanvas(angle);
   if (kind === "tunnelStone" || kind === "tunnelGreen") {
     const outer = kind === "tunnelStone" ? 0x747a72 : 0x6f9862;
     const inner = 0x30433e;
