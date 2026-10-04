@@ -1,7 +1,13 @@
 export const SIZE = 24;
+export const CHUNK_SIZE = SIZE;
 export const STORAGE_KEY = "webtrain-world-v1";
 export type Heading = 0 | 1 | 2 | 3;
 export type Turn = -1 | 0 | 1;
+export type ChunkEdge = "x-" | "x+" | "y-" | "y+";
+export interface Chunk {
+  x: number;
+  y: number;
+}
 
 export type DecorationKind =
   | "house"
@@ -56,6 +62,7 @@ export interface Decoration extends Point {
 }
 export interface World {
   version: 1;
+  chunks: Chunk[];
   tracks: Track[];
   decorations: Decoration[];
   closed: boolean;
@@ -119,13 +126,46 @@ export const isTrackOverlayKind = (kind: DecorationKind) =>
   trackOverlayKinds.includes(kind);
 
 export const same = (a: Point, b: Point) => a.x === b.x && a.y === b.y;
-export const inside = (p: Point) =>
-  Number.isInteger(p.x) &&
-  Number.isInteger(p.y) &&
-  p.x >= 0 &&
-  p.y >= 0 &&
-  p.x < SIZE &&
-  p.y < SIZE;
+export const sameChunk = (a: Chunk, b: Chunk) => a.x === b.x && a.y === b.y;
+export const chunkForCell = (p: Point): Chunk => ({
+  x: Math.floor(p.x / CHUNK_SIZE),
+  y: Math.floor(p.y / CHUNK_SIZE),
+});
+export const inside = (p: Point, world?: Pick<World, "chunks">) => {
+  if (!Number.isInteger(p.x) || !Number.isInteger(p.y)) return false;
+  const chunk = chunkForCell(p);
+  const chunks = world?.chunks ?? [{ x: 0, y: 0 }];
+  return chunks.some((candidate) => sameChunk(candidate, chunk));
+};
+export function neighboringChunk(chunk: Chunk, edge: ChunkEdge): Chunk {
+  if (edge === "x-") return { x: chunk.x - 1, y: chunk.y };
+  if (edge === "x+") return { x: chunk.x + 1, y: chunk.y };
+  if (edge === "y-") return { x: chunk.x, y: chunk.y - 1 };
+  return { x: chunk.x, y: chunk.y + 1 };
+}
+export function exposedChunkEdges(world: Pick<World, "chunks">) {
+  return world.chunks.flatMap((chunk) =>
+    (["x-", "x+", "y-", "y+"] as ChunkEdge[])
+      .filter(
+        (edge) =>
+          !world.chunks.some((other) =>
+            sameChunk(other, neighboringChunk(chunk, edge)),
+          ),
+      )
+      .map((edge) => ({ chunk, edge })),
+  );
+}
+export function expandChunk(
+  world: World,
+  chunk: Chunk,
+  edge: ChunkEdge,
+): boolean {
+  if (!world.chunks.some((candidate) => sameChunk(candidate, chunk))) return false;
+  const next = neighboringChunk(chunk, edge);
+  if (world.chunks.some((candidate) => sameChunk(candidate, next))) return false;
+  world.chunks.push(next);
+  return true;
+}
 
 export const nextCell = (track: Track): Point => ({
   x: track.x + vectors[track.exit].x,
@@ -137,7 +177,7 @@ export function candidate(world: World, turn: Turn): Track | null {
   const last = world.tracks.at(-1)!;
   const cell = nextCell(last);
   if (
-    !inside(cell) ||
+    !inside(cell, world) ||
     world.tracks.some((p) => same(p, cell)) ||
     world.decorations.some((p) => same(p, cell))
   )
@@ -163,7 +203,7 @@ export function placeDecoration(
   cell: Point,
   kind: DecorationKind,
 ): boolean {
-  if (!inside(cell) || world.decorations.some((p) => same(p, cell)))
+  if (!inside(cell, world) || world.decorations.some((p) => same(p, cell)))
     return false;
 
   const hasTrack = world.tracks.some((p) => same(p, cell));
@@ -180,6 +220,7 @@ export function placeDecoration(
 export function createWorld(): World {
   const world: World = {
     version: 1,
+    chunks: [{ x: 0, y: 0 }],
     tracks: [{ x: 5, y: 8, entry: 0, exit: 0 }],
     decorations: [],
     closed: false,
@@ -218,13 +259,30 @@ export function parseWorld(raw: string | null): World | null {
       !Array.isArray(data.decorations) ||
       typeof data.closed !== "boolean" ||
       data.tracks.length < 1 ||
-      data.tracks.length + data.decorations.length > SIZE * SIZE * 2
+      data.tracks.length + data.decorations.length > SIZE * SIZE * Math.max(2, (Array.isArray(data.chunks) ? data.chunks.length : 1) * 2)
     )
       return null;
 
+    const chunks: Chunk[] = Array.isArray(data.chunks)
+      ? data.chunks
+      : [{ x: 0, y: 0 }];
+    if (
+      !chunks.length ||
+      chunks.some(
+        (chunk) =>
+          !chunk ||
+          !Number.isInteger(chunk.x) ||
+          !Number.isInteger(chunk.y),
+      )
+    )
+      return null;
+    const chunkKeys = new Set(chunks.map((chunk) => `${chunk.x},${chunk.y}`));
+    if (chunkKeys.size !== chunks.length) return null;
+    data.chunks = chunks;
+
     const trackCells = new Set<string>();
     for (const t of data.tracks) {
-      if (!t || !inside(t)) return null;
+      if (!t || !inside(t, data)) return null;
       const key = `${t.x},${t.y}`;
       if (trackCells.has(key)) return null;
       trackCells.add(key);
@@ -232,7 +290,7 @@ export function parseWorld(raw: string | null): World | null {
 
     const decorationCells = new Set<string>();
     for (const d of data.decorations) {
-      if (!d || !inside(d) || !kinds.includes(d.kind)) return null;
+      if (!d || !inside(d, data) || !kinds.includes(d.kind)) return null;
       const key = `${d.x},${d.y}`;
       if (decorationCells.has(key)) return null;
       decorationCells.add(key);
