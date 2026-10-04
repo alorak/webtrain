@@ -367,8 +367,8 @@ bind("speed", () => {
 });
 bind("undo", () => scene.undo());
 bind("redo", () => scene.redo());
-bind("remove-track", () => scene.removeLast());
-bind("delete-selected", () => scene.deleteSelectedDecoration());
+bind("remove-track", () => requestDelete("track"));
+bind("delete-selected", () => requestDelete("decoration"));
 bind("home", () => scene.home());
 bind("zoom-in", () => scene.zoom(1.15));
 bind("zoom-out", () => scene.zoom(1 / 1.15));
@@ -392,9 +392,17 @@ document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
     }),
 );
 
+type DeleteTarget = "track" | "decoration";
+let pendingDelete: DeleteTarget | null = null;
+const requestDelete = (target: DeleteTarget) => {
+  pendingDelete = target;
+  $<HTMLDialogElement>("delete-dialog").showModal();
+};
+
 const help = $<HTMLDialogElement>("help-dialog"),
   reset = $<HTMLDialogElement>("reset-dialog"),
-  expand = $<HTMLDialogElement>("expand-dialog");
+  expand = $<HTMLDialogElement>("expand-dialog"),
+  deleteDialog = $<HTMLDialogElement>("delete-dialog");
 let pendingExpansion: { chunk: Chunk; edge: ChunkEdge } | null = null;
 $("help-button").onclick = () => help.showModal();
 help
@@ -428,12 +436,34 @@ expand.addEventListener("cancel", (event) => {
   event.preventDefault();
   cancelExpansion();
 });
+
+const cancelDeletion = () => {
+  pendingDelete = null;
+  if (deleteDialog.open) deleteDialog.close();
+};
+$("cancel-delete").onclick = cancelDeletion;
+$("confirm-delete").onclick = () => {
+  if (scene && pendingDelete === "track") scene.removeLast();
+  else if (scene && pendingDelete === "decoration")
+    scene.deleteSelectedDecoration();
+
+  pendingDelete = null;
+  deleteDialog.close();
+};
+deleteDialog.addEventListener("click", (event) => {
+  if (event.target === deleteDialog) cancelDeletion();
+});
+deleteDialog.addEventListener("cancel", (event) => {
+  event.preventDefault();
+  cancelDeletion();
+});
 window.addEventListener("keydown", (e) => {
   if (
     !scene ||
     help.open ||
     reset.open ||
     expand.open ||
+    deleteDialog.open ||
     (e.target instanceof HTMLElement &&
       /INPUT|SELECT|TEXTAREA/.test(e.target.tagName))
   )
