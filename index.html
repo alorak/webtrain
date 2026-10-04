@@ -168,7 +168,12 @@
         data-icon="trash"
         hidden
       ></button>
-      <div class="view-tools floating">
+      <div
+        id="expand-controls"
+        class="expand-controls"
+        aria-label="Haritayı genişlet"
+      ></div>
+            <div class="view-tools floating">
         <button
           id="zoom-in"
           class="icon-button"
@@ -254,7 +259,16 @@
           Hadi başlayalım <span>↗</span>
         </button>
       </dialog>
-      <dialog id="reset-dialog">
+      <dialog id="expand-dialog">
+        <span class="eyebrow">YENİ ALAN</span>
+        <h2>Haritayı genişlet?</h2>
+        <p>Bu yönde yeni bir 24 × 24 oyun alanı açılacak. Emin misin?</p>
+        <div class="dialog-actions">
+          <button id="cancel-expand">İptal</button
+          ><button id="confirm-expand" class="primary">Genişlet</button>
+        </div>
+      </dialog>
+            <dialog id="reset-dialog">
         <span class="eyebrow">YENİ BİR HİKÂYE</span>
         <h2>Yeni bir dünya kur?</h2>
         <p>
