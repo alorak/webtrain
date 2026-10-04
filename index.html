@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no" />
+    <meta name="theme-color" content="#80c942" />
+    <title>WebTrain MVP</title>
+  </head>
+  <body>
+    <main id="app">
+      <div id="game-root" aria-label="İzometrik tren yolu oyun alanı"></div>
+
+      <section class="hud hud--top" aria-live="polite">
+        <strong>WebTrain</strong>
+        <span>Dokun: ray ekle · Sürükle: haritayı taşı · İki parmak: yakınlaştır</span>
+      </section>
+
+      <nav class="toolbar" aria-label="Ray araçları">
+        <button id="track-tool" class="tool-button tool-button--active" type="button">
+          <span class="tool-button__icon">━</span>
+          <span>Düz ray</span>
+        </button>
+        <button id="track-direction" class="tool-button" type="button">
+          <span class="tool-button__icon">↻</span>
+          <span>Yön: ↘</span>
+        </button>
+      </nav>
+    </main>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
