@@ -305,19 +305,26 @@ export class WebTrainScene extends Phaser.Scene {
     if (Math.abs(after - before) > 1) this.home();
   }
   reset() {
-    this.remember();
-    this.world = {
+    this.loadWorld({
       version: 1,
       chunks: [{ x: 0, y: 0 }],
       tracks: [{ x: 8, y: 9, entry: 0, exit: 0 }],
       decorations: [],
       closed: false,
-    };
+    });
+    // A fresh world starts with its only rail ready to extend.
+    this.setTool("track");
+  }
+  // Replaces the whole world (new game, a save or an import); undo brings
+  // the previous one back.
+  loadWorld(world: World) {
+    this.remember();
+    this.world = structuredClone(world);
     this.playing = false;
     this.trainState = { track: 0, forward: true, t: 0.5 };
     this.trainTrack = null;
-    this.tool = "track";
-    this.selectedRail = this.world.tracks[0];
+    this.tool = "select";
+    this.selectedRail = null;
     this.selectedDecorationIndex = null;
     this.commit();
     this.home();

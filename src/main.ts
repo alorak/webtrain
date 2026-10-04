@@ -3,6 +3,14 @@ import "./style.css";
 import { WebTrainScene, type GameStatus } from "./scenes/WebTrainScene";
 import { decoration } from "./game/art";
 import {
+  deleteSave,
+  exportFileName,
+  exportWorld,
+  importWorld,
+  listSaves,
+  writeSave,
+} from "./game/saves";
+import {
   vectors,
   type Chunk,
   type ChunkEdge,
@@ -38,6 +46,10 @@ const paths: Record<string, string> = {
   hand: '<path d="M8 12V5a2 2 0 0 1 4 0v7-9a2 2 0 0 1 4 0v9-6a2 2 0 0 1 4 0v9c0 5-3 7-7 7-3 0-5-2-7-5l-3-5a2 2 0 0 1 3-2l2 2Z"/>',
   close: '<path d="m6 6 12 12M6 18 18 6"/>',
   check: '<path d="m5 12 4 4L19 6"/>',
+  save: '<path d="M5 3h11l3 3v15H5Z"/><path d="M8 3v5h7V3M8 21v-7h8v7"/>',
+  folder: '<path d="M3 6h7l2 2h9v11H3Z"/>',
+  download: '<path d="M12 3v12m-5-5 5 5 5-5M4 21h16"/>',
+  upload: '<path d="M12 16V4M7 9l5-5 5 5M4 21h16"/>',
 };
 const icon = (name: string) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] ?? ""}</svg>`;
@@ -501,7 +513,7 @@ document.querySelectorAll<HTMLButtonElement>("[data-kind]").forEach(
 );
 
 const help = $<HTMLDialogElement>("help-dialog"),
-  reset = $<HTMLDialogElement>("reset-dialog"),
+  gameDialog = $<HTMLDialogElement>("game-dialog"),
   expand = $<HTMLDialogElement>("expand-dialog"),
   deleteDialog = $<HTMLDialogElement>("delete-dialog");
 let pendingExpansion: { chunk: Chunk; edge: ChunkEdge } | null = null;
@@ -509,12 +521,126 @@ $("help-button").onclick = () => help.showModal();
 help
   .querySelectorAll<HTMLButtonElement>("button")
   .forEach((b) => (b.onclick = () => help.close()));
-$("reset").onclick = () => reset.showModal();
-$("cancel-reset").onclick = () => reset.close();
-$("confirm-reset").onclick = () => {
+
+// Game menu: new game, named saves in this browser, and JSON export/import.
+type GameAction = "new" | "save" | "open" | "export" | "import";
+let currentName = "";
+const gameStatus = (text: string, error = false) => {
+  const el = $("game-status");
+  el.textContent = text;
+  el.classList.toggle("error", error);
+};
+const defaultName = () => currentName || `Dünyam ${listSaves(localStorage).length + 1}`;
+const showGameAction = (action: GameAction | null) => {
+  gameStatus("");
+  gameDialog.querySelectorAll<HTMLButtonElement>("[data-game]").forEach((b) => {
+    const active = b.dataset.game === action;
+    b.classList.toggle("active", active);
+    b.setAttribute("aria-selected", String(active));
+  });
+  gameDialog.querySelectorAll<HTMLElement>("[data-panel-for]").forEach((panel) => {
+    panel.hidden = panel.dataset.panelFor !== action;
+  });
+  if (action === "save" || action === "export") {
+    const input = $<HTMLInputElement>(action === "save" ? "save-name" : "export-name");
+    input.value = defaultName();
+    input.select();
+    input.focus();
+  }
+  if (action === "open") renderSaves();
+};
+const formatDate = (time: number) =>
+  new Date(time).toLocaleString("tr-TR", { dateStyle: "medium", timeStyle: "short" });
+function renderSaves() {
+  const list = $("save-list");
+  const saves = listSaves(localStorage);
+  $("save-empty").hidden = saves.length > 0;
+  list.innerHTML = "";
+  for (const save of saves) {
+    const item = document.createElement("li");
+    const info = document.createElement("div");
+    const name = document.createElement("strong");
+    name.textContent = save.name;
+    const meta = document.createElement("span");
+    meta.textContent = `${formatDate(save.savedAt)} · ${save.world.tracks.length} ray · ${save.world.decorations.length} dekor`;
+    info.append(name, meta);
+    const open = document.createElement("button");
+    open.className = "primary";
+    open.textContent = "Aç";
+    open.onclick = () => {
+      scene?.loadWorld(save.world);
+      currentName = save.name;
+      gameDialog.close();
+      toast(`“${save.name}” açıldı.`);
+    };
+    const remove = document.createElement("button");
+    remove.className = "icon-button";
+    remove.setAttribute("aria-label", `“${save.name}” kaydını sil`);
+    remove.title = "Kaydı sil";
+    remove.innerHTML = icon("trash");
+    remove.onclick = () => {
+      if (!confirm(`“${save.name}” kaydı silinsin mi?`)) return;
+      deleteSave(localStorage, save.id);
+      renderSaves();
+    };
+    item.append(info, open, remove);
+    list.append(item);
+  }
+}
+$("game-menu").onclick = () => {
+  showGameAction(null);
+  gameDialog.showModal();
+};
+$("close-game").onclick = () => gameDialog.close();
+gameDialog.addEventListener("click", (event) => {
+  if (event.target === gameDialog) gameDialog.close();
+});
+gameDialog.querySelectorAll<HTMLButtonElement>("[data-game]").forEach((button) => {
+  button.onclick = () => showGameAction(button.dataset.game as GameAction);
+});
+$("confirm-new").onclick = () => {
   scene?.reset();
-  reset.close();
+  currentName = "";
+  gameDialog.close();
   toast("Yeni bir dünya, yeni bir hikâye.");
+};
+$("confirm-save").onclick = () => {
+  if (!scene) return;
+  try {
+    const entry = writeSave(localStorage, $<HTMLInputElement>("save-name").value, scene.world);
+    currentName = entry.name;
+    gameDialog.close();
+    toast(`“${entry.name}” kaydedildi.`);
+  } catch {
+    gameStatus("Kaydedilemedi: tarayıcı depolaması dolu ya da kapalı. Dışa aktarmayı dene.", true);
+  }
+};
+$("confirm-export").onclick = () => {
+  if (!scene) return;
+  const name = $<HTMLInputElement>("export-name").value || defaultName();
+  const blob = new Blob([exportWorld(scene.world, name)], { type: "application/json" });
+  const link = document.createElement("a");
+  link.href = URL.createObjectURL(blob);
+  link.download = exportFileName(name);
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+  gameStatus(`${link.download} indirildi.`);
+};
+$("choose-import").onclick = () => $<HTMLInputElement>("import-file").click();
+$<HTMLInputElement>("import-file").onchange = async (event) => {
+  const input = event.target as HTMLInputElement;
+  const file = input.files?.[0];
+  input.value = "";
+  if (!file || !scene) return;
+  const loaded = importWorld(await file.text());
+  if (!loaded) {
+    gameStatus("Bu dosya bir WebTrain dünyası değil ya da bozuk.", true);
+    return;
+  }
+  scene.loadWorld(loaded.world);
+  currentName = loaded.name || file.name.replace(/\.json$/i, "");
+  gameDialog.close();
+  toast(`“${currentName}” içe aktarıldı.`);
 };
 const cancelExpansion = () => {
   pendingExpansion = null;
@@ -562,7 +688,7 @@ window.addEventListener("keydown", (e) => {
   if (
     !scene ||
     help.open ||
-    reset.open ||
+    gameDialog.open ||
     expand.open ||
     deleteDialog.open ||
     (e.target instanceof HTMLElement &&
