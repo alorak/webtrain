@@ -8,6 +8,7 @@ import {
   type Chunk,
   entrances,
   vectors,
+  type Cargo,
   type DecorationKind,
   type Entrance,
   type PenLinks,
@@ -1987,7 +1988,15 @@ function tunnel(g: G, frame: Frame, green: boolean) {
 }
 
 // A little 3D locomotive: its boxes are projected in the direction of travel.
-export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
+// car: the engine, or a wagon for passengers or freight; index varies the
+// freight wagons along the train.
+export function locomotive(
+  g: G,
+  point: Point,
+  tangent: Point,
+  car: "engine" | Cargo = "engine",
+  index = 0,
+) {
   const scale = 0.76;
   const p = (forward: number, side: number, height: number) => {
     const pos = project({
@@ -2077,8 +2086,27 @@ export function locomotive(g: G, point: Point, tangent: Point, wagon = false) {
       ellipse(g, 0xccc5a1, wheel.x, wheel.y, 3, 3);
     }
   box(-0.36, 0.36, 0.17, 5, 10, [0xdeae69, 0xba7855, 0x986047]);
-  if (wagon) {
-    box(-0.29, 0.29, 0.16, 10, 21, [0xeecf8c, 0xc6a266, 0xaa8959]);
+  // Only the side of a wagon that faces the viewer gets windows or a door.
+  const near = p(0, 0.16, 0).y > p(0, -0.16, 0).y ? 0.161 : -0.161;
+  if (car === "passengers") {
+    box(-0.34, 0.34, 0.16, 10, 27, [0xf2e6c8, 0x4f8f86, 0x3f7a72]);
+    for (const a of [-0.27, -0.12, 0.03, 0.18])
+      face(0xf7df9e, [[a, near, 16], [a + 0.09, near, 16], [a + 0.09, near, 23], [a, near, 23]]);
+    box(-0.36, 0.36, 0.175, 27, 30, [0x36594f, 0x28493f, 0x203e37]);
+    return;
+  }
+  if (car === "freight") {
+    if (index % 2 === 0) {
+      // Covered van with a sliding door.
+      box(-0.33, 0.33, 0.16, 10, 26, [0xc96a5c, 0x9b453b, 0x84392f]);
+      face(0x84392f, [[-0.09, near, 11], [0.09, near, 11], [0.09, near, 24], [-0.09, near, 24]]);
+      face(0xd9b27e, [[-0.01, near, 11], [0.01, near, 11], [0.01, near, 24], [-0.01, near, 24]]);
+    } else {
+      // Open wagon carrying crates.
+      box(-0.33, 0.33, 0.16, 10, 17, [0x8a6142, 0x7a5638, 0x684a30]);
+      box(-0.27, -0.04, 0.11, 17, 26, [0xe6c68f, 0xc9a266, 0xa98654]);
+      box(0.03, 0.26, 0.11, 17, 23, [0xd9b27e, 0xb98955, 0x9b7048]);
+    }
     return;
   }
   box(-0.29, -0.02, 0.16, 10, 34, [0x659f97, 0x377c79, 0x286660]);
